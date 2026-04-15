@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Create Interview Guide{% endblock %}
+
+{% block content %}
+
+<!-- Hero / intro -->
+<div class="text-center mb-10">
+    <h1 class="text-3xl font-bold text-anura-950 tracking-tight mb-3">Create an Interview Preparation Guide</h1>
+    <p class="text-gray-500 text-base max-w-xl mx-auto leading-relaxed">Fill in the details below and we'll generate a personalized prep guide for your candidate — complete with tailored talking points, smart questions to ask, and day-of logistics.</p>
+</div>
+
+{% if error %}
+<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+    {{ error }}
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'generate_guide' %}" id="guideForm">
+    {% csrf_token %}
+
+    <!-- Candidate & Role -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Candidate &amp; Role</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label for="candidate_name" class="block text-sm font-medium text-gray-700 mb-1">Candidate Name <span class="text-red-500">*</span></label>
+                <input type="text" id="candidate_name" name="candidate_name"
+                       value="{{ form_data.candidate_name|default:'' }}" required
+                       placeholder="Jane Smith"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+            <div>
+                <label for="job_title" class="block text-sm font-medium text-gray-700 mb-1">Job Title <span class="text-red-500">*</span></label>
+                <input type="text" id="job_title" name="job_title"
+                       value="{{ form_data.job_title|default:'' }}" required
+                       placeholder="Epic Ambulatory Analyst"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+        </div>
+        <div>
+            <label for="job_description" class="block text-sm font-medium text-gray-700 mb-1">Job Description <span class="text-red-500">*</span></label>
+            <textarea id="job_description" name="job_description" rows="5" required
+                      placeholder="Paste the full job description here..."
+                      class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ form_data.job_description|default:'' }}</textarea>
+            <p class="text-xs text-gray-400 mt-1">The more detail you include, the more tailored the guide will be.</p>
+        </div>
+    </div>
+
+    <!-- Health System -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Health System</h2>
+        <div class="mb-4">
+            <label for="health_system_name" class="block text-sm font-medium text-gray-700 mb-1">Health System Name <span class="text-red-500">*</span></label>
+            <input type="text" id="health_system_name" name="health_system_name"
+                   value="{{ form_data.health_system_name|default:'' }}" required
+                   placeholder="UW Health"
+                   class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+        </div>
+        <div>
+            <label for="health_system_info" class="block text-sm font-medium text-gray-700 mb-1">About the Health System</label>
+            <textarea id="health_system_info" name="health_system_info" rows="3"
+                      placeholder="Background info, size, locations, recent news, Epic environment details..."
+                      class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ form_data.health_system_info|default:'' }}</textarea>
+            <p class="text-xs text-gray-400 mt-1">Optional — any context that helps the candidate understand the organization.</p>
+        </div>
+    </div>
+
+    <!-- Interviewer Details -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Interviewer Details</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label for="interviewer_name" class="block text-sm font-medium text-gray-700 mb-1">Interviewer Name</label>
+                <input type="text" id="interviewer_name" name="interviewer_name"
+                       value="{{ form_data.interviewer_name|default:'' }}"
+                       placeholder="Dr. Sarah Johnson"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+            <div>
+                <label for="interviewer_title" class="block text-sm font-medium text-gray-700 mb-1">Interviewer Title</label>
+                <input type="text" id="interviewer_title" name="interviewer_title"
+                       value="{{ form_data.interviewer_title|default:'' }}"
+                       placeholder="VP of Clinical Informatics"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+        </div>
+        <div class="mb-4">
+            <label for="interviewer_linkedin" class="block text-sm font-medium text-gray-700 mb-1">Interviewer LinkedIn URL</label>
+            <input type="url" id="interviewer_linkedin" name="interviewer_linkedin"
+                   value="{{ form_data.interviewer_linkedin|default:'' }}"
+                   placeholder="https://linkedin.com/in/..."
+                   class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+        </div>
+        <div>
+            <label for="interviewer_background" class="block text-sm font-medium text-gray-700 mb-1">Interviewer Background Notes</label>
+            <textarea id="interviewer_background" name="interviewer_background" rows="3"
+                      placeholder="Anything you know — their background, focus areas, what they care about..."
+                      class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ form_data.interviewer_background|default:'' }}</textarea>
+            <p class="text-xs text-gray-400 mt-1">Copy/paste from their LinkedIn profile, notes from previous interactions, etc.</p>
+        </div>
+    </div>
+
+    <!-- Interview Logistics -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Interview Logistics</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label for="interview_date" class="block text-sm font-medium text-gray-700 mb-1">Interview Date</label>
+                <input type="date" id="interview_date" name="interview_date"
+                       value="{{ form_data.interview_date|default:'' }}"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+            <div>
+                <label for="interview_time" class="block text-sm font-medium text-gray-700 mb-1">Interview Time</label>
+                <input type="time" id="interview_time" name="interview_time"
+                       value="{{ form_data.interview_time|default:'' }}"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+            <div>
+                <label for="interview_format" class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+                <select id="interview_format" name="interview_format"
+                        class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition bg-white">
+                    <option value="In-Person" {% if form_data.interview_format == 'In-Person' %}selected{% endif %}>In-Person</option>
+                    <option value="Video (Zoom/Teams)" {% if form_data.interview_format == 'Video (Zoom/Teams)' %}selected{% endif %}>Video (Zoom/Teams)</option>
+                    <option value="Phone" {% if form_data.interview_format == 'Phone' %}selected{% endif %}>Phone</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label for="interview_location" class="block text-sm font-medium text-gray-700 mb-1">Location / Meeting Link</label>
+            <input type="text" id="interview_location" name="interview_location"
+                   value="{{ form_data.interview_location|default:'' }}"
+                   placeholder="123 Hospital Dr, Suite 400 or https://zoom.us/j/..."
+                   class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+        </div>
+    </div>
+
+    <!-- Anura Connect Contact -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Anura Connect Contact</h2>
+        <p class="text-xs text-gray-400 mb-4">Who should the candidate reach out to with questions?</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+                <label for="contact_name" class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                <input type="text" id="contact_name" name="contact_name"
+                       value="{{ form_data.contact_name|default:'' }}"
+                       placeholder="Rachel Neill"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+            <div>
+                <label for="contact_email" class="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+                <input type="email" id="contact_email" name="contact_email"
+                       value="{{ form_data.contact_email|default:'' }}"
+                       placeholder="rachel@anuraconnect.com"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+            <div>
+                <label for="contact_phone" class="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                <input type="tel" id="contact_phone" name="contact_phone"
+                       value="{{ form_data.contact_phone|default:'' }}"
+                       placeholder="(608) 555-1234"
+                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+            </div>
+        </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="text-center pt-2">
+        <button type="submit" id="submitBtn"
+                class="inline-flex items-center justify-center px-8 py-3 bg-anura-500 hover:bg-anura-600 text-white font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-anura-100 focus:ring-offset-2">
+            <span class="btn-text">Generate Interview Guide</span>
+            <span class="btn-loading hidden">
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Generating...
+            </span>
+        </button>
+    </div>
+</form>
+
+<!-- How It Works (matches Resume Tool's 3-step section) -->
+<div class="mt-16 mb-8">
+    <h2 class="text-center text-lg font-semibold text-anura-950 mb-8">How It Works</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div class="text-center">
+            <div class="w-10 h-10 bg-anura-50 text-anura-500 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-sm">1</div>
+            <h3 class="font-semibold text-sm text-gray-800 mb-1">Enter the Details</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">Fill in the job description, health system info, interviewer details, and logistics.</p>
+        </div>
+        <div class="text-center">
+            <div class="w-10 h-10 bg-anura-50 text-anura-500 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-sm">2</div>
+            <h3 class="font-semibold text-sm text-gray-800 mb-1">AI Generates the Guide</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">We use AI to create tailored talking points and smart questions alongside proven interview best practices.</p>
+        </div>
+        <div class="text-center">
+            <div class="w-10 h-10 bg-anura-50 text-anura-500 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-sm">3</div>
+            <h3 class="font-semibold text-sm text-gray-800 mb-1">Download &amp; Send</h3>
+            <p class="text-xs text-gray-500 leading-relaxed">Download the branded PDF and send it to your candidate before their interview.</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('guideForm').addEventListener('submit', function() {
+    const btn = document.getElementById('submitBtn');
+    btn.querySelector('.btn-text').classList.add('hidden');
+    btn.querySelector('.btn-loading').classList.remove('hidden');
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-wait');
+});
+</script>
+{% endblock %}

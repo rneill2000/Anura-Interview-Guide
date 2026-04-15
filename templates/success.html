@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Guide Ready{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center py-16">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 max-w-md w-full text-center">
+
+        <!-- Success checkmark -->
+        <div class="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+
+        <h1 class="text-2xl font-bold text-anura-950 mb-3">Interview Guide Ready</h1>
+
+        <p class="text-gray-500 text-sm mb-8 leading-relaxed">
+            Guide for <strong class="text-gray-700">{{ candidate_name }}</strong><br>
+            {{ job_title }} at {{ health_system_name }}
+        </p>
+
+        <div class="space-y-3">
+            <a href="{% url 'download_guide' filename %}"
+               class="block w-full px-6 py-3 bg-anura-500 hover:bg-anura-600 text-white font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow">
+                Download PDF
+            </a>
+            <a href="{% url 'index' %}"
+               class="block w-full px-6 py-3 border-2 border-anura-500 text-anura-500 hover:bg-anura-50 font-semibold rounded-lg text-sm transition-all duration-200">
+                Create Another Guide
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

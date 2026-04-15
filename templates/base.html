@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Interview Guide Generator{% endblock %} | Anura Connect</title>
+
+    <!-- Inter font (matches Resume Tool) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS (matches Resume Tool) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        anura: {
+                            50:  '#e8f4f8',
+                            100: '#c8e4ed',
+                            200: '#92c9db',
+                            300: '#5cafc9',
+                            400: '#2d8faa',
+                            500: '#1a6b8a',
+                            600: '#145a75',
+                            700: '#0f4860',
+                            800: '#0b3549',
+                            900: '#0a2239',
+                            950: '#071a2c',
+                        },
+                        accent: {
+                            50:  '#e6f7f9',
+                            100: '#b3e8ef',
+                            200: '#80d9e5',
+                            300: '#54a4bc',
+                            400: '#4d97ad',
+                            500: '#3d8a9e',
+                            600: '#2d7d8f',
+                            700: '#1d6070',
+                            800: '#0d4351',
+                            900: '#002632',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    {% load static %}
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header (matches Resume Tool: white bg, logo left) -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 no-underline">
+                <img src="{% static 'images/anura_logo.png' %}" alt="Anura Connect" class="h-10">
+            </a>
+            <span class="text-anura-900 text-sm font-medium hidden sm:block">Interview Guide Generator</span>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="flex-1">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-200 bg-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 text-center">
+            <p class="text-gray-400 text-sm">&copy; 2026 Anura Connect &middot; <a href="https://anuraconnect.com" target="_blank" class="text-anura-500 hover:text-anura-600 no-underline">anuraconnect.com</a></p>
+        </div>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
