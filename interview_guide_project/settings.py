@@ -12,10 +12,14 @@ DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
-CSRF_TRUSTED_ORIGINS = [
+_raw_origins = [
     origin.strip()
     for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    o if o.startswith(('http://', 'https://')) else f'https://{o}'
+    for o in _raw_origins
 ]
 
 INSTALLED_APPS = [
