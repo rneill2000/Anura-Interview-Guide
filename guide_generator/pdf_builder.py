@@ -12,7 +12,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, ListFlowable, ListItem, PageBreak, Image,
+    HRFlowable, ListFlowable, ListItem, PageBreak, Image as RLImage,
     KeepTogether,
 )
 from reportlab.graphics.shapes import Drawing, Rect, Circle, String, Line
@@ -210,13 +210,33 @@ def _draw_cover(canvas, doc, form_data):
     canvas.restoreState()
 
 
-def _section_divider(story, title, styles):
-    """Add a section title with teal accent line."""
+def _section_divider(story, title, styles, icon_key=None):
+    """Add a section title with optional icon and teal accent line."""
     story.append(Spacer(1, 28))
-    story.append(Paragraph(title, styles['section_title']))
+    if icon_key and icon_key in SECTION_ICONS:
+        icon = _icon_from_b64(SECTION_ICONS[icon_key], 22, 22)
+        title_tbl = Table(
+            [[icon, Paragraph(title, styles['section_title'])]],
+            colWidths=[30, None],
+        )
+        title_tbl.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        story.append(title_tbl)
+    else:
+        story.append(Paragraph(title, styles['section_title']))
     story.append(HRFlowable(width="100%", thickness=2, color=TEAL,
                              spaceAfter=12, spaceBefore=3))
 
+
+def _icon_from_b64(b64_str, w=24, h=24):
+    """Convert a base64 PNG string to a ReportLab Image."""
+    img_data = b64mod.b64decode(b64_str)
+    return RLImage(BytesIO(img_data), width=w, height=h)
 
 def _draw_icon(icon_type):
     """Draw a 28x28 icon for the Before the Interview cards."""
@@ -475,13 +495,13 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     story.append(PageBreak())
 
     # ── The Role ──
-    _section_divider(story, "The Role", styles)
+    _section_divider(story, "The Role", styles, icon_key="the_role")
     story.append(Paragraph(form_data['job_title'], styles['role_title']))
     story.append(Spacer(1, 4))
     _render_job_description(story, form_data['job_description'], styles, content_width)
 
     # ── About the Client ──
-    _section_divider(story, f"About {form_data['health_system_name']}", styles)
+    _section_divider(story, f"About {form_data['health_system_name']}", styles, icon_key="about_client")
     # Website and address details
     detail_parts = []
     if form_data.get('health_system_website'):
@@ -502,7 +522,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Recent News ──
     if guide_content.get('recent_news'):
-        _section_divider(story, f"Recent News: {form_data['health_system_name']}", styles)
+        _section_divider(story, f"Recent News: {form_data['health_system_name']}", styles, icon_key="news")
         story.append(Paragraph(
             "Stay current — referencing recent events shows you've done your homework.",
             styles['section_subtitle'],
@@ -546,7 +566,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Your Interviewer ──
     if form_data.get('interviewer_name'):
-        _section_divider(story, "Your Interviewer", styles)
+        _section_divider(story, "Your Interviewer", styles, icon_key="interviewer")
         name = form_data['interviewer_name']
         if form_data.get('interviewer_linkedin'):
             name = f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>{name}</u></a>'
@@ -563,7 +583,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                     story.append(Paragraph(para, styles['body']))
 
     # ── Pre-Interview Essentials (2x2 card grid) ──
-    _section_divider(story, "Before the Interview", styles)
+    _section_divider(story, "Before the Interview", styles, icon_key="logistics")
     story.append(Paragraph(
         "Complete these steps before your interview to set yourself up for success.",
         styles['section_subtitle'],
@@ -610,7 +630,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Key Talking Points ──
     if guide_content.get('talking_points'):
-        _section_divider(story, "Key Talking Points", styles)
+        _section_divider(story, "Key Talking Points", styles, icon_key="talking_points")
         story.append(Paragraph(
             "Weave these into your interview answers to demonstrate alignment with the role.",
             styles['section_subtitle'],
@@ -621,7 +641,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Questions to Ask ──
     if guide_content.get('questions_to_ask'):
-        _section_divider(story, "Questions to Ask", styles)
+        _section_divider(story, "Questions to Ask", styles, icon_key="questions_ask")
         story.append(Paragraph(
             "Asking thoughtful questions shows preparation and genuine interest.",
             styles['section_subtitle'],
@@ -632,7 +652,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Prepare For These Questions (AI-generated likely interview questions) ──
     if guide_content.get('likely_questions'):
-        _section_divider(story, "Prepare For These Questions", styles)
+        _section_divider(story, "Prepare For These Questions", styles, icon_key="likely_questions")
         story.append(Paragraph(
             "Based on the role and job description, you may be asked questions like these. "
             "Think through your answers ahead of time.",
@@ -646,7 +666,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── After the Interview (compact) ──
     if guide_content.get('follow_up_tips'):
-        _section_divider(story, "After the Interview", styles)
+        _section_divider(story, "After the Interview", styles, icon_key="follow_up")
         story.append(Paragraph(
             "Following up well can be the difference between an offer and a close second.",
             styles['section_subtitle'],
