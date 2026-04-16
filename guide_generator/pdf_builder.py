@@ -218,13 +218,39 @@ def _section_divider(story, title, styles):
                              spaceAfter=8, spaceBefore=2))
 
 
-def _build_card(title, text, styles, width):
-    """Build a single essentials card as a Table with modern styling."""
-    # Icon circle
+def _draw_icon(icon_type):
+    """Draw a 28x28 icon for the Before the Interview cards."""
     d = Drawing(28, 28)
     d.add(Circle(14, 14, 14, fillColor=NAVY, strokeColor=None))
-    d.add(String(14, 8.5, "+", fontSize=14, fillColor=WHITE,
-                 textAnchor='middle', fontName='Helvetica-Bold'))
+    if icon_type == 'screen':
+        d.add(Rect(6, 10, 16, 11, fillColor=None, strokeColor=WHITE, strokeWidth=1.5, rx=1.5))
+        d.add(Line(14, 10, 14, 7, strokeColor=WHITE, strokeWidth=1.5))
+        d.add(Line(10, 7, 18, 7, strokeColor=WHITE, strokeWidth=1.5))
+    elif icon_type == 'building':
+        d.add(Rect(8, 6, 12, 16, fillColor=None, strokeColor=WHITE, strokeWidth=1.5, rx=1))
+        d.add(Rect(11, 18, 6, 4, fillColor=WHITE, strokeColor=None))
+        d.add(Rect(10, 14, 3, 2.5, fillColor=WHITE, strokeColor=None))
+        d.add(Rect(15, 14, 3, 2.5, fillColor=WHITE, strokeColor=None))
+        d.add(Rect(10, 10, 3, 2.5, fillColor=WHITE, strokeColor=None))
+        d.add(Rect(15, 10, 3, 2.5, fillColor=WHITE, strokeColor=None))
+    elif icon_type == 'person':
+        d.add(Circle(14, 19, 4, fillColor=None, strokeColor=WHITE, strokeWidth=1.5))
+        d.add(Rect(7, 5, 14, 10, fillColor=None, strokeColor=WHITE, strokeWidth=1.5, rx=3))
+    elif icon_type == 'document':
+        d.add(Rect(8, 5, 12, 16, fillColor=None, strokeColor=WHITE, strokeWidth=1.5, rx=1.5))
+        d.add(Line(11, 17, 19, 17, strokeColor=WHITE, strokeWidth=1.2))
+        d.add(Line(11, 14, 19, 14, strokeColor=WHITE, strokeWidth=1.2))
+        d.add(Line(11, 11, 17, 11, strokeColor=WHITE, strokeWidth=1.2))
+    else:
+        d.add(String(14, 8.5, "+", fontSize=14, fillColor=WHITE,
+                     textAnchor='middle', fontName='Helvetica-Bold'))
+    return d
+
+
+def _build_card(title, text, styles, width, icon_type=None):
+    """Build a single essentials card as a Table with modern styling."""
+    # Icon circle
+    d = _draw_icon(icon_type)
 
     content = [
         [d],
@@ -480,7 +506,8 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
          "Prepare questions about the team, challenges, and 6\u201312 month direction."),
     ]
 
-    c = [_build_card(t, txt, styles, card_w) for t, txt in cards]
+    icon_types = ['screen', 'building', 'person', 'document']
+    c = [_build_card(t, txt, styles, card_w, icon_type=ic) for (t, txt), ic in zip(cards, icon_types)]
     grid = Table(
         [[c[0], c[1]], [c[2], c[3]]],
         colWidths=[card_w + 7, card_w + 7],
