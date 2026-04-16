@@ -23,6 +23,19 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # ─── TEMPLATE CONTENT (no AI needed) ────────────────────────────────────
 
+DEFAULT_INTERVIEW_TIPS = [
+    "Test your technology (video, audio, internet connection) at least 30 minutes before the interview.",
+    "Dress business casual — when in doubt, overdress rather than underdress.",
+    "Have your resume printed or pulled up somewhere easy to reference during the conversation.",
+    "Sign into the meeting or arrive at the location a few minutes early.",
+    "Keep a glass of water and a notepad nearby.",
+    "Silence your phone completely before the interview starts.",
+    "Prepare 2–3 specific examples of your work using the STAR method (Situation, Task, Action, Result).",
+    "Research the organization beforehand — review their website, recent news, and mission statement.",
+    "Make eye contact, smile, and address the interviewer by name.",
+    "Be honest about what you don't know, but frame it positively and show willingness to learn.",
+]
+
 GENERAL_TIPS = [
     "Research the organization thoroughly before the interview — review their website, recent news, mission statement, and any publicly available strategic plans.",
     "Arrive 10–15 minutes early. If virtual, test your audio/video setup 30 minutes beforehand and have a backup plan (phone dial-in number) ready.",
@@ -187,6 +200,48 @@ Keep it practical and actionable. No fluff. Do NOT invent biographical details �
     return result if result else ""
 
 
+def _generate_likely_questions(form_data: dict) -> list[str]:
+    """AI-generated questions the interviewer is likely to ask, so the candidate can prepare."""
+    prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
+
+Role: {form_data['job_title']}
+Health System: {form_data['health_system_name']}
+Job Description:
+{form_data['job_description']}
+
+{f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
+{f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}
+
+Generate 6-8 questions the interviewer is likely to ask the candidate based on the job description and role. Include a mix of:
+- Technical/skill-based questions specific to the role
+- Behavioral questions (e.g. "Tell me about a time when...")
+- Situational questions related to healthcare IT
+
+For each question, add a brief one-sentence tip in parentheses on how to approach the answer.
+
+Return ONLY a JSON array of strings. No markdown, no explanation. Example:
+["Question here? (Tip: Focus on specific outcomes and metrics.)"]"""
+
+    result = _call_claude(prompt)
+    if result:
+        try:
+            cleaned = result.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            return json.loads(cleaned)
+        except (json.JSONDecodeError, IndexError):
+            logger.warning("Could not parse AI likely questions, using fallback.")
+
+    return [
+        f"Tell me about your experience with the technologies mentioned in the {form_data['job_title']} job description. (Tip: Be specific — name the modules, tools, or systems you've worked with.)",
+        "Describe a challenging go-live or system implementation you supported. What was your role and how did you handle obstacles? (Tip: Use the STAR method — Situation, Task, Action, Result.)",
+        "How do you prioritize tasks when you have multiple urgent requests from different departments? (Tip: Give a real example showing your decision-making process.)",
+        f"Why are you interested in working at {form_data['health_system_name']}? (Tip: Reference something specific about the organization — their mission, recent initiatives, or growth.)",
+        "How do you handle pushback from clinical end-users during a system change or workflow update? (Tip: Show empathy for the user's perspective while explaining how you drive adoption.)",
+        "Where do you see yourself in 2-3 years? (Tip: Align your growth goals with the opportunities this role provides.)",
+    ]
+
+
 # ─── MAIN GENERATOR ─────────────────────────────────────────────────────
 
 def generate_interview_guide(form_data: dict) -> dict:
@@ -196,13 +251,26 @@ def generate_interview_guide(form_data: dict) -> dict:
     """
     talking_points = _generate_talking_points(form_data)
     questions_to_ask = _generate_questions_to_ask(form_data)
+    likely_questions = _generate_likely_questions(form_data)
     interviewer_insights = _generate_interviewer_insights(form_data)
+
+    # Use custom interview tips from form if provided, otherwise defaults
+    custom_tips_text = form_data.get("interview_tips", "").strip()
+    if custom_tips_text:
+        interview_tips = [
+            line.strip() for line in custom_tips_text.splitlines()
+            if line.strip()
+        ]
+    else:
+        interview_tips = list(DEFAULT_INTERVIEW_TIPS)
 
     return {
         "talking_points": talking_points,
         "questions_to_ask": questions_to_ask,
+        "likely_questions": likely_questions,
         "interviewer_insights": interviewer_insights,
         "general_tips": GENERAL_TIPS,
+        "interview_tips": interview_tips,
         "follow_up_tips": FOLLOW_UP_TIPS,
         "day_of_checklist": DAY_OF_CHECKLIST,
     }

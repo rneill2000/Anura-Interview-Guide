@@ -22,7 +22,7 @@ from reportlab.lib.utils import ImageReader
 import io
 import base64
 
-# --- ANURA CONNECT BRAND COLORS ---
+# ─── ANURA CONNECT BRAND COLORS ────────────────────────────────────────
 NAVY = HexColor("#071a2c")
 NAVY_MID = HexColor("#0a2239")
 TEAL = HexColor("#1a6b8a")
@@ -208,6 +208,8 @@ def _build_card(title, text, styles, width):
     # Icon circle
     d = Drawing(32, 32)
     d.add(Circle(16, 16, 16, fillColor=NAVY, strokeColor=None))
+    d.add(String(16, 10, "✦", fontSize=14, fillColor=WHITE,
+                 textAnchor='middle', fontName='Helvetica'))
 
     content = [
         [d],
@@ -299,22 +301,22 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     story = []
 
-    # -- Cover page (drawn via canvas callback, just force a page break) --
+    # ── Cover page (drawn via canvas callback, just force a page break) ──
     story.append(PageBreak())
 
-    # -- The Role --
+    # ── The Role ──
     _section_divider(story, "The Role", styles)
     story.append(Paragraph(form_data['job_title'], styles['role_title']))
     jd = form_data['job_description'].replace('\n', '<br/>')
     story.append(Paragraph(jd, styles['body']))
 
-    # -- About the Health System --
+    # ── About the Health System ──
     if form_data.get('health_system_info'):
         _section_divider(story, f"About {form_data['health_system_name']}", styles)
         info = form_data['health_system_info'].replace('\n', '<br/>')
         story.append(Paragraph(info, styles['body']))
 
-    # -- Your Interviewer --
+    # ── Your Interviewer ──
     if form_data.get('interviewer_name'):
         _section_divider(story, "Your Interviewer", styles)
 
@@ -335,7 +337,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                 if para:
                     story.append(Paragraph(para, styles['body']))
 
-    # -- Pre-Interview Essentials (2x2 card grid) --
+    # ── Pre-Interview Essentials (2x2 card grid) ──
     _section_divider(story, "Pre-Interview Essentials", styles)
 
     is_virtual = any(k in form_data.get('interview_format', '').lower()
@@ -344,7 +346,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     tech_text = ("Test your video/audio 30 minutes before the call. Ensure stable internet, "
                  "working camera, and clear microphone. Have the meeting link ready."
                  if is_virtual else
-                 "Arrive 10-15 minutes early. Know the building entrance, parking, and check-in process.")
+                 "Arrive 10–15 minutes early. Know the building entrance, parking, and check-in process.")
 
     card_w = (content_width - 12) / 2
     cards = [
@@ -355,10 +357,10 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         ("Professional Appearance",
          "Dress in business professional attire." +
          (" Ensure your background is clean and professional." if is_virtual else "") +
-         " First impressions matter - when in doubt, overdress."),
+         " First impressions matter — when in doubt, overdress."),
         ("Materials Ready",
          "Have your resume and specific project examples accessible. "
-         "Prepare questions about the team, challenges, and 6-12 month direction."),
+         "Prepare questions about the team, challenges, and 6–12 month direction."),
     ]
 
     c = [_build_card(t, txt, styles, card_w) for t, txt in cards]
@@ -376,7 +378,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     ]))
     story.append(grid)
 
-    # -- Key Talking Points --
+    # ── Key Talking Points ──
     if guide_content.get('talking_points'):
         _section_divider(story, "Key Talking Points", styles)
         story.append(Paragraph(
@@ -387,7 +389,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             story.append(_build_talking_point(i, point, styles, content_width))
             story.append(Spacer(1, 6))
 
-    # -- Questions to Ask --
+    # ── Questions to Ask ──
     if guide_content.get('questions_to_ask'):
         _section_divider(story, "Questions to Ask", styles)
         story.append(Paragraph(
@@ -399,7 +401,31 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER_GRAY,
                                      spaceAfter=6, spaceBefore=6))
 
-    # -- Interview Best Practices --
+    # ── Prepare For These Questions (AI-generated likely interview questions) ──
+    if guide_content.get('likely_questions'):
+        _section_divider(story, "Prepare For These Questions", styles)
+        story.append(Paragraph(
+            "Based on the role and job description, you may be asked questions like these. Think through your answers ahead of time.",
+            styles['section_subtitle'],
+        ))
+        for i, q in enumerate(guide_content['likely_questions'], 1):
+            # Split question from tip if parenthetical tip exists
+            story.append(_build_talking_point(i, q, styles, content_width))
+            story.append(Spacer(1, 6))
+
+    # ── Interview Tips (recruiter-customizable) ──
+    if guide_content.get('interview_tips'):
+        _section_divider(story, "Interview Tips", styles)
+        items = []
+        for t in guide_content['interview_tips']:
+            items.append(ListItem(
+                Paragraph(t, styles['tip']),
+                bulletColor=TEAL,
+            ))
+        story.append(ListFlowable(items, bulletType='bullet',
+                                   bulletFontSize=7, leftIndent=14))
+
+    # ── Interview Best Practices ──
     if guide_content.get('general_tips'):
         _section_divider(story, "Interview Best Practices", styles)
         items = []
@@ -411,7 +437,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         story.append(ListFlowable(items, bulletType='bullet',
                                    bulletFontSize=7, leftIndent=14))
 
-    # -- After the Interview --
+    # ── After the Interview ──
     if guide_content.get('follow_up_tips'):
         _section_divider(story, "After the Interview", styles)
         items = []
@@ -423,7 +449,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         story.append(ListFlowable(items, bulletType='bullet',
                                    bulletFontSize=7, leftIndent=14))
 
-    # -- Contact Footer --
+    # ── Contact Footer ──
     if any(form_data.get(k) for k in ('contact_name', 'contact_email', 'contact_phone')):
         story.append(Spacer(1, 20))
         parts = []
@@ -437,7 +463,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         contact_content = [
             [Paragraph("Your Anura Connect Contact", styles['contact_title'])],
             [Paragraph("  |  ".join(parts), styles['contact_info'])],
-            [Paragraph("Reach out with any questions before your interview - we're here to help you succeed.",
+            [Paragraph("Reach out with any questions before your interview — we're here to help you succeed.",
                         styles['contact_cta'])],
         ]
 

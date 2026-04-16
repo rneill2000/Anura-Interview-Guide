@@ -7,7 +7,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
 
-from guide_generator.generator import generate_interview_guide
+from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS
 from guide_generator.pdf_builder import build_guide_pdf
 
 # Simple in-memory status tracker (same pattern as Resume Tool)
@@ -17,7 +17,9 @@ _generation_lock = threading.Lock()
 
 def index(request):
     """Main form page."""
-    return render(request, "index.html")
+    return render(request, "index.html", {
+        "default_tips": "\n".join(DEFAULT_INTERVIEW_TIPS),
+    })
 
 
 @require_http_methods(["POST"])
@@ -41,6 +43,7 @@ def generate_guide(request):
         "contact_name": request.POST.get("contact_name", "").strip(),
         "contact_email": request.POST.get("contact_email", "").strip(),
         "contact_phone": request.POST.get("contact_phone", "").strip(),
+        "interview_tips": request.POST.get("interview_tips", "").strip(),
     }
 
     # Validate required fields
