@@ -66,7 +66,7 @@ def _styles():
     )
     s['section_subtitle'] = ParagraphStyle(
         'SectionSubtitle', fontName='Helvetica', fontSize=10,
-        textColor=MED_GRAY, spaceAfter=14, leading=14.5,
+        textColor=MED_GRAY, spaceAfter=16, leading=14.5,
     )
     s['role_title'] = ParagraphStyle(
         'RoleTitle', fontName='Helvetica-Bold', fontSize=14,
@@ -94,7 +94,7 @@ def _styles():
     )
     s['card_text'] = ParagraphStyle(
         'CardText', fontName='Helvetica', fontSize=9.5,
-        leading=14, textColor=DARK_GRAY,
+        leading=14.5, textColor=DARK_GRAY,
     )
     s['point_text'] = ParagraphStyle(
         'PointText', fontName='Helvetica', fontSize=10.5,
@@ -212,10 +212,10 @@ def _draw_cover(canvas, doc, form_data):
 
 def _section_divider(story, title, styles):
     """Add a section title with teal accent line."""
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 28))
     story.append(Paragraph(title, styles['section_title']))
-    story.append(HRFlowable(width="100%", thickness=2.5, color=TEAL,
-                             spaceAfter=8, spaceBefore=2))
+    story.append(HRFlowable(width="100%", thickness=2, color=TEAL,
+                             spaceAfter=12, spaceBefore=3))
 
 
 def _draw_icon(icon_type):
@@ -251,11 +251,21 @@ def _build_card(title, text, styles, width, icon_type=None):
     """Build a single essentials card as a Table with modern styling."""
     # Icon circle
     d = _draw_icon(icon_type)
-
+    header = Table(
+        [[d, Paragraph(f"<b>{title}</b>", styles['card_title'])]],
+        colWidths=[36, width - 52],
+    )
+    header.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ('LEFTPADDING', (1, 0), (1, 0), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
     content = [
-        [d],
-        [Spacer(1, 4)],
-        [Paragraph(f"<b>{title}</b>", styles['card_title'])],
+        [header],
+        [Spacer(1, 6)],
         [Paragraph(text, styles['card_text'])],
     ]
     card = Table(content, colWidths=[width])
@@ -346,6 +356,82 @@ def _build_tip_item(text, styles, width):
     return row
 
 
+
+import re as _re_module
+
+def _render_job_description(story, jd_text, styles, content_width):
+    jd_heading = ParagraphStyle(
+        'JDHeading', fontName='Helvetica-Bold', fontSize=10.5,
+        leading=15, textColor=NAVY, spaceBefore=10, spaceAfter=4,
+    )
+    jd_bullet = ParagraphStyle(
+        'JDBullet', fontName='Helvetica', fontSize=10,
+        leading=14.5, textColor=DARK_GRAY, leftIndent=18, bulletIndent=6,
+        spaceBefore=2, spaceAfter=2,
+    )
+    jd_body = ParagraphStyle(
+        'JDBody', fontName='Helvetica', fontSize=10,
+        leading=15, textColor=DARK_GRAY, spaceAfter=6,
+    )
+
+    lines = jd_text.split('\n')
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if not line:
+            i += 1
+            continue
+
+        is_heading = False
+        if line.endswith(':') and len(line) < 80:
+            is_heading = True
+        elif line.isupper() and len(line) < 80:
+            is_heading = True
+        elif (len(line) < 60
+              and i + 1 < len(lines)
+              and lines[i + 1].strip()
+              and _re_module.match(r'^[\u2022\-\*\u2013]\s', lines[i + 1].strip())):
+            is_heading = True
+
+        if is_heading:
+            heading_text = line.rstrip(':').strip()
+            if heading_text.isupper():
+                heading_text = heading_text.title()
+            story.append(Paragraph(heading_text, jd_heading))
+            i += 1
+            continue
+
+        bullet_match = _re_module.match(r'^[\u2022\-\*\u2013]\s*(.+)', line)
+        if bullet_match:
+            story.append(Paragraph('\u2022  ' + bullet_match.group(1).strip(), jd_bullet))
+            i += 1
+            continue
+
+        num_match = _re_module.match(r'^\d+[.)\]]\s*(.+)', line)
+        if num_match:
+            story.append(Paragraph('\u2022  ' + num_match.group(1).strip(), jd_bullet))
+            i += 1
+            continue
+
+        para_lines = [line]
+        i += 1
+        while i < len(lines):
+            nl = lines[i].strip()
+            if not nl:
+                break
+            if nl.endswith(':') and len(nl) < 80:
+                break
+            if _re_module.match(r'^[\u2022\-\*\u2013]\s', nl):
+                break
+            if _re_module.match(r'^\d+[.)\]]\s', nl):
+                break
+            if nl.isupper() and len(nl) < 80:
+                break
+            para_lines.append(nl)
+            i += 1
+        story.append(Paragraph(' '.join(para_lines), jd_body))
+
+
 def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     """Build the full interview guide PDF."""
 
@@ -391,8 +477,8 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     # ── The Role ──
     _section_divider(story, "The Role", styles)
     story.append(Paragraph(form_data['job_title'], styles['role_title']))
-    jd = form_data['job_description'].replace('\n', '<br/>')
-    story.append(Paragraph(jd, styles['body']))
+    story.append(Spacer(1, 4))
+    _render_job_description(story, form_data['job_description'], styles, content_width)
 
     # ── About the Client ──
     _section_divider(story, f"About {form_data['health_system_name']}", styles)
@@ -456,7 +542,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                 ('LINEBEFORE', (0, 0), (0, -1), 3, TEAL),
             ]))
             story.append(news_card)
-            story.append(Spacer(1, 6))
+            story.append(Spacer(1, 10))
 
     # ── Your Interviewer ──
     if form_data.get('interviewer_name'):
@@ -515,8 +601,8 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     )
     grid.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
@@ -531,7 +617,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         ))
         for i, point in enumerate(guide_content['talking_points'], 1):
             story.append(_build_talking_point(i, point, styles, content_width))
-            story.append(Spacer(1, 5))
+            story.append(Spacer(1, 8))
 
     # ── Questions to Ask ──
     if guide_content.get('questions_to_ask'):
@@ -542,7 +628,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         ))
         for q in guide_content['questions_to_ask']:
             story.append(_build_question_row(q, styles, content_width))
-            story.append(Spacer(1, 5))
+            story.append(Spacer(1, 8))
 
     # ── Prepare For These Questions (AI-generated likely interview questions) ──
     if guide_content.get('likely_questions'):
@@ -561,13 +647,17 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     # ── After the Interview (compact) ──
     if guide_content.get('follow_up_tips'):
         _section_divider(story, "After the Interview", styles)
+        story.append(Paragraph(
+            "Following up well can be the difference between an offer and a close second.",
+            styles['section_subtitle'],
+        ))
         tips = guide_content['follow_up_tips'][:4]
         for tip in tips:
             story.append(_build_tip_item(tip, styles, content_width))
 
     # ── Contact Footer ──
     if any(form_data.get(k) for k in ('contact_name', 'contact_email', 'contact_phone')):
-        story.append(Spacer(1, 24))
+        story.append(Spacer(1, 32))
         parts = []
         if form_data.get('contact_name'):
             parts.append(f"<b>{form_data['contact_name']}</b>")
