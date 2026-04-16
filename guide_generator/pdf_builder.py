@@ -193,7 +193,19 @@ def _draw_cover(canvas, doc, form_data):
         y -= 22
         canvas.setFillColor(ACCENT)
         canvas.setFont("Helvetica", 11)
-        canvas.drawString(72, y, form_data['interview_date'])
+        tz = form_data.get('interview_timezone', '')
+        date_str = form_data['interview_date']
+        if form_data.get('interview_time'):
+            # Format time nicely
+            try:
+                from datetime import datetime
+                t = datetime.strptime(form_data['interview_time'], '%H:%M')
+                date_str += f"  \u2502  {t.strftime('%I:%M %p').lstrip('0')}"
+            except Exception:
+                date_str += f"  \u2502  {form_data['interview_time']}"
+        if tz:
+            date_str += f" {tz}"
+        canvas.drawString(72, y, date_str)
 
     canvas.restoreState()
 
@@ -358,10 +370,19 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── About the Client ──
     _section_divider(story, f"About {form_data['health_system_name']}", styles)
+    # Website and address details
+    detail_parts = []
+    if form_data.get('health_system_website'):
+        url = form_data['health_system_website']
+        detail_parts.append(f'<a href="{url}" color="#1a6b8a"><u>{url}</u></a>')
+    if form_data.get('health_system_address'):
+        detail_parts.append(form_data['health_system_address'])
+    if detail_parts:
+        story.append(Paragraph("  \u2502  ".join(detail_parts), styles['body']))
     if form_data.get('health_system_info'):
         info = form_data['health_system_info'].replace('\n', '<br/>')
         story.append(Paragraph(info, styles['body']))
-    else:
+    elif not detail_parts:
         story.append(Paragraph(
             f"Visit {form_data['health_system_name']}\u2019s website to learn about their mission, values, and recent initiatives before your interview.",
             styles['body'],
