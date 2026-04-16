@@ -18,6 +18,59 @@
 <form method="post" action="{% url 'generate_guide' %}" id="guideForm">
     {% csrf_token %}
 
+    {% if bullhorn_enabled %}
+    <!-- Pull from Bullhorn -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            Pull from Bullhorn
+        </h2>
+        <p class="text-xs text-gray-400 mb-4">Search Bullhorn to auto-fill candidate and job details below.</p>
+
+        <!-- Candidate Search -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Find Candidate</label>
+            <div class="flex gap-2">
+                <input type="text" id="bh-candidate-search" placeholder="Search by name (e.g. Jane Smith)..."
+                    class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-anura-500 focus:ring-1 focus:ring-anura-100 outline-none transition"
+                    autocomplete="off">
+                <button type="button" onclick="searchBullhornCandidates()" id="bh-candidate-search-btn"
+                    class="bg-anura-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-anura-600 transition flex-shrink-0">
+                    Search
+                </button>
+            </div>
+            <div id="bh-candidate-loading" class="hidden mt-2 text-center">
+                <span class="text-gray-400 text-xs">Searching Bullhorn...</span>
+            </div>
+            <div id="bh-candidate-error" class="hidden mt-2">
+                <p class="text-red-600 text-xs" id="bh-candidate-error-msg"></p>
+            </div>
+            <div id="bh-candidate-results" class="hidden mt-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <!-- Job Order Search -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Find Job Order</label>
+            <div class="flex gap-2">
+                <input type="text" id="bh-job-search" placeholder="Search job title (e.g. Epic Analyst)..."
+                    class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-anura-500 focus:ring-1 focus:ring-anura-100 outline-none transition"
+                    autocomplete="off">
+                <button type="button" onclick="searchBullhornJobs()" id="bh-job-search-btn"
+                    class="bg-anura-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-anura-600 transition flex-shrink-0">
+                    Search
+                </button>
+            </div>
+            <div id="bh-job-loading" class="hidden mt-2 text-center">
+                <span class="text-gray-400 text-xs">Searching Bullhorn...</span>
+            </div>
+            <div id="bh-job-error" class="hidden mt-2">
+                <p class="text-red-600 text-xs" id="bh-job-error-msg"></p>
+            </div>
+            <div id="bh-job-results" class="hidden mt-2 space-y-1.5 max-h-48 overflow-y-auto"></div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Candidate & Role -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
         <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Candidate &amp; Role</h2>
@@ -339,5 +392,177 @@ function escapeHtml(text) {
     div.appendChild(document.createTextNode(text));
     return div.innerHTML;
 }
+
+{% if bullhorn_enabled %}
+// ── Bullhorn Candidate Search ──────────────────────────────
+document.getElementById('bh-candidate-search').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); searchBullhornCandidates(); }
+});
+
+function searchBullhornCandidates() {
+    const query = document.getElementById('bh-candidate-search').value.trim();
+    const loading = document.getElementById('bh-candidate-loading');
+    const error = document.getElementById('bh-candidate-error');
+    const results = document.getElementById('bh-candidate-results');
+
+    if (query.length < 2) {
+        error.classList.remove('hidden');
+        document.getElementById('bh-candidate-error-msg').textContent = 'Enter at least 2 characters to search.';
+        return;
+    }
+
+    loading.classList.remove('hidden');
+    error.classList.add('hidden');
+    results.classList.add('hidden');
+    results.innerHTML = '';
+
+    fetch("{% url 'bullhorn_candidate_search' %}?q=" + encodeURIComponent(query))
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('hidden');
+        if (!data.ok) {
+            error.classList.remove('hidden');
+            document.getElementById('bh-candidate-error-msg').textContent = data.error;
+            return;
+        }
+        if (data.results.length === 0) {
+            error.classList.remove('hidden');
+            document.getElementById('bh-candidate-error-msg').textContent = 'No candidates found for "' + query + '"';
+            return;
+        }
+        results.classList.remove('hidden');
+        data.results.forEach(function(c) {
+            const card = document.createElement('div');
+            card.className = 'flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3 hover:border-anura-300 transition cursor-pointer';
+            card.innerHTML =
+                '<div class="min-w-0 flex-1">' +
+                    '<p class="text-sm font-medium text-anura-900 truncate">' + escapeHtml(c.firstName + ' ' + c.lastName) + '</p>' +
+                    '<p class="text-xs text-gray-400">' + escapeHtml(c.email || 'No email') + ' · ID ' + c.id + '</p>' +
+                '</div>' +
+                '<button type="button" class="ml-3 text-xs bg-anura-500 text-white px-3 py-1.5 rounded-lg hover:bg-anura-600 transition flex-shrink-0">Use</button>';
+            card.querySelector('button').addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectCandidate(c);
+            });
+            card.addEventListener('click', function() { selectCandidate(c); });
+            results.appendChild(card);
+        });
+    })
+    .catch(function() {
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        document.getElementById('bh-candidate-error-msg').textContent = 'Failed to search Bullhorn.';
+    });
+}
+
+function selectCandidate(c) {
+    document.getElementById('candidate_name').value = (c.firstName + ' ' + c.lastName).trim();
+    document.getElementById('bh-candidate-results').classList.add('hidden');
+    document.getElementById('bh-candidate-search').value = '';
+    // Flash the field to show it was filled
+    const field = document.getElementById('candidate_name');
+    field.classList.add('ring-2', 'ring-anura-200');
+    setTimeout(function() { field.classList.remove('ring-2', 'ring-anura-200'); }, 1500);
+}
+
+// ── Bullhorn Job Order Search ──────────────────────────────
+document.getElementById('bh-job-search').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); searchBullhornJobs(); }
+});
+
+function searchBullhornJobs() {
+    const query = document.getElementById('bh-job-search').value.trim();
+    const loading = document.getElementById('bh-job-loading');
+    const error = document.getElementById('bh-job-error');
+    const results = document.getElementById('bh-job-results');
+
+    if (query.length < 2) {
+        error.classList.remove('hidden');
+        document.getElementById('bh-job-error-msg').textContent = 'Enter at least 2 characters to search.';
+        return;
+    }
+
+    loading.classList.remove('hidden');
+    error.classList.add('hidden');
+    results.classList.add('hidden');
+    results.innerHTML = '';
+
+    fetch("{% url 'bullhorn_job_search' %}?q=" + encodeURIComponent(query))
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('hidden');
+        if (!data.ok) {
+            error.classList.remove('hidden');
+            document.getElementById('bh-job-error-msg').textContent = data.error;
+            return;
+        }
+        if (data.results.length === 0) {
+            error.classList.remove('hidden');
+            document.getElementById('bh-job-error-msg').textContent = 'No job orders found for "' + query + '"';
+            return;
+        }
+        results.classList.remove('hidden');
+        data.results.forEach(function(jo) {
+            const card = document.createElement('div');
+            card.className = 'flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3 hover:border-anura-300 transition cursor-pointer';
+            card.innerHTML =
+                '<div class="min-w-0 flex-1">' +
+                    '<p class="text-sm font-medium text-anura-900 truncate">' + escapeHtml(jo.title) + '</p>' +
+                    '<p class="text-xs text-gray-400">' + escapeHtml(jo.client) + (jo.status ? ' · ' + escapeHtml(jo.status) : '') + ' · ID ' + jo.id + '</p>' +
+                '</div>' +
+                '<button type="button" class="ml-3 text-xs bg-anura-500 text-white px-3 py-1.5 rounded-lg hover:bg-anura-600 transition flex-shrink-0">Use</button>';
+            card.querySelector('button').addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectJobOrder(jo.id, jo.title, jo.client);
+            });
+            card.addEventListener('click', function() { selectJobOrder(jo.id, jo.title, jo.client); });
+            results.appendChild(card);
+        });
+    })
+    .catch(function() {
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        document.getElementById('bh-job-error-msg').textContent = 'Failed to search Bullhorn.';
+    });
+}
+
+function selectJobOrder(jobId, title, client) {
+    const loading = document.getElementById('bh-job-loading');
+    const results = document.getElementById('bh-job-results');
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+
+    fetch("{% url 'bullhorn_job_search' %}?id=" + jobId)
+    .then(r => r.json())
+    .then(data => {
+        loading.classList.add('hidden');
+        if (data.ok && data.job_order) {
+            // Fill job title
+            document.getElementById('job_title').value = data.job_order.title;
+            // Strip HTML tags from the description and fill
+            const tmp = document.createElement('div');
+            tmp.innerHTML = data.job_order.description;
+            const plainText = tmp.textContent || tmp.innerText || '';
+            document.getElementById('job_description').value = plainText.trim();
+            // Fill health system name from client corporation
+            if (data.job_order.client) {
+                document.getElementById('health_system_name').value = data.job_order.client;
+            }
+            document.getElementById('bh-job-search').value = '';
+            // Flash the fields to show they were filled
+            ['job_title', 'job_description', 'health_system_name'].forEach(function(id) {
+                const field = document.getElementById(id);
+                field.classList.add('ring-2', 'ring-anura-200');
+                setTimeout(function() { field.classList.remove('ring-2', 'ring-anura-200'); }, 1500);
+            });
+            // Scroll to the filled section
+            document.getElementById('job_title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    })
+    .catch(function() {
+        loading.classList.add('hidden');
+    });
+}
+{% endif %}
 </script>
 {% endblock %}

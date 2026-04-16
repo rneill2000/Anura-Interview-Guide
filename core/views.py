@@ -15,10 +15,19 @@ _generation_status = {}
 _generation_lock = threading.Lock()
 
 
+def _bullhorn_configured():
+    """Check whether Bullhorn API credentials are set."""
+    return bool(
+        getattr(settings, "BULLHORN_CLIENT_ID", "")
+        and getattr(settings, "BULLHORN_API_PASSWORD", "")
+    )
+
+
 def index(request):
     """Main form page."""
     return render(request, "index.html", {
         "default_tips": "\n".join(DEFAULT_INTERVIEW_TIPS),
+        "bullhorn_enabled": _bullhorn_configured(),
     })
 
 
@@ -53,6 +62,7 @@ def generate_guide(request):
         return render(request, "index.html", {
             "error": f"Please fill in: {', '.join(missing)}",
             "form_data": form_data,
+            "bullhorn_enabled": _bullhorn_configured(),
         })
 
     # Generate unique ID for this guide
@@ -91,6 +101,68 @@ def fetch_news(request):
 
     news = _generate_recent_news({"health_system_name": health_system_name})
     return JsonResponse({"news": news})
+
+
+# -- Bullhorn API endpoints ------------------------------------------------
+
+def bullhorn_candidate_search(request):
+    """AJAX endpoint to search Bullhorn candidates by name."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    query = request.GET.get("q", "").strip()
+    candidate_id = request.GET.get("id", "").strip()
+
+    if not _bullhorn_configured():
+        return JsonResponse({"ok": False, "error": "Bullhorn not configured."}, status=500)
+
+    try:
+        from core.bullhorn import search_candidates, get_candidate
+
+        if candidate_id:
+            candidate = get_candidate(int(candidate_id))
+            return JsonResponse({"ok": True, "candidate": candidate})
+        elif query and len(query) >= 2:
+            results = search_candidates(query)
+            return JsonResponse({"ok": True, "results": results})
+        else:
+            return JsonResponse({"ok": True, "results": []})
+    except Exception:
+        logger.exception("Bullhorn candidate search failed")
+        return JsonResponse(
+            {"ok": False, "error": "Could not search Bullhorn candidates."},
+            status=500,
+        )
+
+
+def bullhorn_job_search(request):
+    """AJAX endpoint to search Bullhorn job orders by title/keyword."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    query = request.GET.get("q", "").strip()
+    job_id = request.GET.get("id", "").strip()
+
+    if not _bullhorn_configured():
+        return JsonResponse({"ok": False, "error": "Bullhorn not configured."}, status=500)
+
+    try:
+        from core.bullhorn import search_job_orders, get_job_order
+
+        if job_id:
+            jo = get_job_order(int(job_id))
+            return JsonResponse({"ok": True, "job_order": jo})
+        elif query and len(query) >= 2:
+            results = search_job_orders(query)
+            return JsonResponse({"ok": True, "results": results})
+        else:
+            return JsonResponse({"ok": True, "results": []})
+    except Exception:
+        logger.exception("Bullhorn job order search failed")
+        return JsonResponse(
+            {"ok": False, "error": "Could not search Bullhorn job orders."},
+            status=500,
+        )
 
 
 def download_guide(request, filename):
