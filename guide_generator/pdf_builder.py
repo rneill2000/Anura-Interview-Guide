@@ -210,9 +210,12 @@ def _draw_cover(canvas, doc, form_data):
     canvas.restoreState()
 
 
-def _section_divider(story, title, styles, icon_key=None):
-    """Add a section title with optional icon and teal accent line."""
-    story.append(Spacer(1, 28))
+def _section_divider(story, title, styles, icon_key=None, keep_with_next=None):
+    """Add a section title with optional icon and teal accent line.
+    If keep_with_next is provided (a list of flowables), the header and those
+    flowables are wrapped in KeepTogether so headers never orphan at page bottom.
+    """
+    header_elements = [Spacer(1, 28)]
     if icon_key:
         icon = _section_icon(icon_key, 22)
         title_tbl = Table(
@@ -226,11 +229,15 @@ def _section_divider(story, title, styles, icon_key=None):
             ('TOPPADDING', (0, 0), (-1, -1), 0),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
-        story.append(title_tbl)
+        header_elements.append(title_tbl)
     else:
-        story.append(Paragraph(title, styles['section_title']))
-    story.append(HRFlowable(width="100%", thickness=2, color=TEAL,
+        header_elements.append(Paragraph(title, styles['section_title']))
+    header_elements.append(HRFlowable(width="100%", thickness=2, color=TEAL,
                              spaceAfter=12, spaceBefore=3))
+    if keep_with_next:
+        story.append(KeepTogether(header_elements + keep_with_next))
+    else:
+        story.extend(header_elements)
 
 
 def _section_icon(icon_key, size=20):
@@ -531,13 +538,12 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     story.append(PageBreak())
 
     # ── The Role ──
-    _section_divider(story, "The Role", styles, icon_key="the_role")
-    story.append(Paragraph(form_data['job_title'], styles['role_title']))
-    story.append(Spacer(1, 4))
+    first_content = [Paragraph(form_data['job_title'], styles['role_title']), Spacer(1, 4)]
+    _section_divider(story, "The Role", styles, icon_key="the_role", keep_with_next=first_content)
     _render_job_description(story, form_data['job_description'], styles, content_width)
 
     # ── About the Client ──
-    _section_divider(story, f"About {form_data['health_system_name']}", styles, icon_key="about_client")
+    about_first = []
     # Website and address details
     detail_parts = []
     if form_data.get('health_system_website'):
@@ -558,11 +564,11 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Recent News ──
     if guide_content.get('recent_news'):
-        _section_divider(story, f"Recent News: {form_data['health_system_name']}", styles, icon_key="news")
-        story.append(Paragraph(
+        news_subtitle = [Paragraph(
             "Stay current — referencing recent events shows you've done your homework.",
             styles['section_subtitle'],
-        ))
+        )]
+        _section_divider(story, f"Recent News: {form_data['health_system_name']}", styles, icon_key="news", keep_with_next=news_subtitle)
         for item in guide_content['recent_news']:
             headline = item.get('headline', '')
             summary = item.get('summary', '')
@@ -602,16 +608,16 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Your Interviewer ──
     if form_data.get('interviewer_name'):
-        _section_divider(story, "Your Interviewer", styles, icon_key="interviewer")
         name = form_data['interviewer_name']
         if form_data.get('interviewer_linkedin'):
             name = f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>{name}</u></a>'
-        story.append(Paragraph(name, styles['interviewer_name']))
+        interviewer_first = [Paragraph(name, styles['interviewer_name'])]
         if form_data.get('interviewer_title'):
-            story.append(Paragraph(
+            interviewer_first.append(Paragraph(
                 f"Role: {form_data['interviewer_title']} at {form_data['health_system_name']}",
                 styles['interviewer_role'],
             ))
+        _section_divider(story, "Your Interviewer", styles, icon_key="interviewer", keep_with_next=interviewer_first)
         if guide_content.get('interviewer_insights'):
             for para in guide_content['interviewer_insights'].strip().split('\n\n'):
                 para = para.strip()
@@ -619,11 +625,11 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                     story.append(Paragraph(para, styles['body']))
 
     # ── Pre-Interview Essentials (2x2 card grid) ──
-    _section_divider(story, "Before the Interview", styles, icon_key="logistics")
-    story.append(Paragraph(
+    logistics_subtitle = [Paragraph(
         "Complete these steps before your interview to set yourself up for success.",
         styles['section_subtitle'],
-    ))
+    )]
+    _section_divider(story, "Before the Interview", styles, icon_key="logistics", keep_with_next=logistics_subtitle)
 
     is_virtual = any(k in form_data.get('interview_format', '').lower()
                      for k in ('video', 'zoom', 'teams', 'phone'))
@@ -666,35 +672,47 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Key Talking Points ──
     if guide_content.get('talking_points'):
-        _section_divider(story, "Key Talking Points", styles, icon_key="talking_points")
-        story.append(Paragraph(
-            "Weave these into your interview answers to demonstrate alignment with the role.",
-            styles['section_subtitle'],
-        ))
-        for i, point in enumerate(guide_content['talking_points'], 1):
+        tp_first = [
+            Paragraph(
+                "Weave these into your interview answers to demonstrate alignment with the role.",
+                styles['section_subtitle'],
+            ),
+            _build_talking_point(1, guide_content['talking_points'][0], styles, content_width),
+            Spacer(1, 8),
+        ]
+        _section_divider(story, "Key Talking Points", styles, icon_key="talking_points", keep_with_next=tp_first)
+        for i, point in enumerate(guide_content['talking_points'][1:], 2):
             story.append(_build_talking_point(i, point, styles, content_width))
             story.append(Spacer(1, 8))
 
     # ── Questions to Ask ──
     if guide_content.get('questions_to_ask'):
-        _section_divider(story, "Questions to Ask", styles, icon_key="questions_ask")
-        story.append(Paragraph(
-            "Asking thoughtful questions shows preparation and genuine interest.",
-            styles['section_subtitle'],
-        ))
-        for q in guide_content['questions_to_ask']:
+        qa_first = [
+            Paragraph(
+                "Asking thoughtful questions shows preparation and genuine interest.",
+                styles['section_subtitle'],
+            ),
+            _build_question_row(guide_content['questions_to_ask'][0], styles, content_width),
+            Spacer(1, 8),
+        ]
+        _section_divider(story, "Questions to Ask", styles, icon_key="questions_ask", keep_with_next=qa_first)
+        for q in guide_content['questions_to_ask'][1:]:
             story.append(_build_question_row(q, styles, content_width))
             story.append(Spacer(1, 8))
 
     # ── Prepare For These Questions (AI-generated likely interview questions) ──
     if guide_content.get('likely_questions'):
-        _section_divider(story, "Prepare For These Questions", styles, icon_key="likely_questions")
-        story.append(Paragraph(
-            "Based on the role and job description, you may be asked questions like these. "
-            "Think through your answers ahead of time.",
-            styles['section_subtitle'],
-        ))
-        for i, q in enumerate(guide_content['likely_questions'], 1):
+        lq_first = [
+            Paragraph(
+                "Based on the role and job description, you may be asked questions like these. "
+                "Think through your answers ahead of time.",
+                styles['section_subtitle'],
+            ),
+            _build_talking_point(1, guide_content['likely_questions'][0], styles, content_width),
+            Spacer(1, 5),
+        ]
+        _section_divider(story, "Prepare For These Questions", styles, icon_key="likely_questions", keep_with_next=lq_first)
+        for i, q in enumerate(guide_content['likely_questions'][1:], 2):
             story.append(_build_talking_point(i, q, styles, content_width))
             story.append(Spacer(1, 5))
 
@@ -702,13 +720,16 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── After the Interview (compact) ──
     if guide_content.get('follow_up_tips'):
-        _section_divider(story, "After the Interview", styles, icon_key="follow_up")
-        story.append(Paragraph(
-            "Following up well can be the difference between an offer and a close second.",
-            styles['section_subtitle'],
-        ))
         tips = guide_content['follow_up_tips'][:4]
-        for tip in tips:
+        fu_first = [
+            Paragraph(
+                "Following up well can be the difference between an offer and a close second.",
+                styles['section_subtitle'],
+            ),
+            _build_tip_item(tips[0], styles, content_width),
+        ]
+        _section_divider(story, "After the Interview", styles, icon_key="follow_up", keep_with_next=fu_first)
+        for tip in tips[1:]:
             story.append(_build_tip_item(tip, styles, content_width))
 
     # ── Contact Footer ──
