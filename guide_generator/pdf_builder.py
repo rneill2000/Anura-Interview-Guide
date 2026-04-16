@@ -82,7 +82,7 @@ def _styles():
     )
     s['interviewer_name'] = ParagraphStyle(
         'InterviewerName', fontName='Helvetica-Bold', fontSize=16,
-        textColor=TEAL, spaceAfter=12,
+        textColor=TEAL, spaceAfter=16,
     )
     s['interviewer_role'] = ParagraphStyle(
         'InterviewerRole', fontName='Helvetica-Bold', fontSize=10,
@@ -211,74 +211,24 @@ def _draw_cover(canvas, doc, form_data):
 
 
 def _section_divider(story, title, styles, icon_key=None, keep_with_next=None):
-    """Add a section title with optional icon and teal accent line.
+    """Add a section title with teal accent line.
     If keep_with_next is provided (a list of flowables), the header and those
     flowables are wrapped in KeepTogether so headers never orphan at page bottom.
     """
-    header_elements = [Spacer(1, 28)]
-    if icon_key:
-        icon = _section_icon(icon_key, 22)
-        title_tbl = Table(
-            [[icon, Paragraph(title, styles['section_title'])]],
-            colWidths=[30, None],
-        )
-        title_tbl.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        header_elements.append(title_tbl)
-    else:
-        header_elements.append(Paragraph(title, styles['section_title']))
-    header_elements.append(HRFlowable(width="100%", thickness=2, color=TEAL,
-                             spaceAfter=12, spaceBefore=3))
+    header_elements = [Spacer(1, 36)]
+    header_elements.append(Paragraph(title, styles['section_title']))
+    header_elements.append(HRFlowable(width="100%", thickness=1.5, color=TEAL,
+                             spaceAfter=14, spaceBefore=4))
     if keep_with_next:
         story.append(KeepTogether(header_elements + keep_with_next))
     else:
         story.extend(header_elements)
 
-
-def _section_icon(icon_key, size=20):
-    """Draw a small teal accent icon for section headers."""
+def _section_icon(icon_key, size=10):
+    """Draw a small teal accent dot."""
     d = Drawing(size, size)
     r = size / 2
     d.add(Circle(r, r, r, fillColor=TEAL, strokeColor=None))
-    # Simple white shape per section type
-    if icon_key == "the_role":
-        d.add(Rect(r-4, r-3, 8, 7, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
-        d.add(Line(r-2, r+4, r+2, r+4, strokeColor=WHITE, strokeWidth=1.2))
-    elif icon_key == "about_client":
-        d.add(Rect(r-3, r-4, 6, 9, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
-        d.add(Rect(r-1, r-1, 2, 2, fillColor=WHITE, strokeColor=None))
-        d.add(Rect(r-1, r+2, 2, 2, fillColor=WHITE, strokeColor=None))
-    elif icon_key == "news":
-        d.add(Rect(r-4, r-3, 8, 7, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
-        d.add(Line(r-2, r+1, r+2, r+1, strokeColor=WHITE, strokeWidth=1))
-        d.add(Line(r-2, r-1, r+2, r-1, strokeColor=WHITE, strokeWidth=1))
-    elif icon_key == "interviewer":
-        d.add(Circle(r, r+2, 2.5, fillColor=None, strokeColor=WHITE, strokeWidth=1.2))
-        d.add(Rect(r-4, r-5, 8, 5, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=2))
-    elif icon_key == "talking_points":
-        d.add(Rect(r-4, r-2, 8, 6, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=2))
-        d.add(Line(r-2, r+2, r+2, r+2, strokeColor=WHITE, strokeWidth=1))
-        d.add(Line(r-2, r, r+1, r, strokeColor=WHITE, strokeWidth=1))
-    elif icon_key == "questions_ask":
-        d.add(String(r, r-4, "?", fontSize=10, fillColor=WHITE, textAnchor="middle", fontName="Helvetica-Bold"))
-    elif icon_key == "likely_questions":
-        d.add(Rect(r-3, r-4, 6, 9, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
-        d.add(Line(r-1, r+2, r+1, r+2, strokeColor=WHITE, strokeWidth=1))
-        d.add(Line(r-1, r, r+1, r, strokeColor=WHITE, strokeWidth=1))
-        d.add(Line(r-1, r-2, r+1, r-2, strokeColor=WHITE, strokeWidth=1))
-    elif icon_key == "follow_up":
-        d.add(Line(r-3, r, r-1, r-3, strokeColor=WHITE, strokeWidth=1.5))
-        d.add(Line(r-1, r-3, r+4, r+3, strokeColor=WHITE, strokeWidth=1.5))
-    elif icon_key == "logistics":
-        d.add(Rect(r-4, r-3, 8, 7, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
-        d.add(Line(r-4, r+1, r+4, r+1, strokeColor=WHITE, strokeWidth=1))
-    else:
-        d.add(String(r, r-4, "+", fontSize=10, fillColor=WHITE, textAnchor="middle", fontName="Helvetica-Bold"))
     return d
 
 def _draw_icon(icon_type):
@@ -369,16 +319,7 @@ def _build_talking_point(number, text, styles, width):
         ('RIGHTPADDING', (-1, -1), (-1, -1), 14),
     ]))
 
-    # Outer wrapper with left teal accent border
-    outer = Table([[row]], colWidths=[width])
-    outer.setStyle(TableStyle([
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ('LINEBEFORE', (0, 0), (0, -1), 3, TEAL),
-    ]))
-    return outer
+    return row
 
 
 def _build_question_row(text, styles, width):
@@ -394,7 +335,7 @@ def _build_question_row(text, styles, width):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('LEFTPADDING', (0, 0), (-1, -1), 14),
         ('RIGHTPADDING', (0, 0), (-1, -1), 14),
-        ('LINEBEFORE', (0, 0), (0, -1), 2.5, ACCENT),
+        ('LINEBEFORE', (0, 0), (0, -1), 2, ACCENT),
     ]))
     return row
 
@@ -460,8 +401,41 @@ def _render_job_description(story, jd_text, styles, content_width):
             heading_text = line.rstrip(':').strip()
             if heading_text.isupper():
                 heading_text = heading_text.title()
-            story.append(Paragraph(heading_text, jd_heading))
+            # Collect heading + next few items to keep together on same page
+            heading_group = [Paragraph(heading_text, jd_heading)]
             i += 1
+            peek_count = 0
+            while i < len(lines) and peek_count < 3:
+                peek = lines[i].strip()
+                if not peek:
+                    i += 1
+                    continue
+                # Stop if next line is also a heading
+                peek_is_heading = False
+                if peek.endswith(':') and len(peek) < 80:
+                    peek_is_heading = True
+                elif peek.isupper() and len(peek) < 80:
+                    peek_is_heading = True
+                if peek_is_heading:
+                    break
+                bullet_m = _re_module.match(r'^[\u2022\-\*\u2013]\s*(.+)', peek)
+                num_m = _re_module.match(r'^\d+[.)\]]\s*(.+)', peek)
+                if bullet_m:
+                    heading_group.append(Paragraph('\u2022  ' + bullet_m.group(1).strip(), jd_bullet))
+                    i += 1
+                    peek_count += 1
+                    continue
+                elif num_m:
+                    heading_group.append(Paragraph('\u2022  ' + num_m.group(1).strip(), jd_bullet))
+                    i += 1
+                    peek_count += 1
+                    continue
+                else:
+                    heading_group.append(Paragraph(peek, jd_body))
+                    i += 1
+                    peek_count += 1
+                    break
+            story.append(KeepTogether(heading_group))
             continue
 
         bullet_match = _re_module.match(r'^[\u2022\-\*\u2013]\s*(.+)', line)
@@ -683,7 +657,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         _section_divider(story, "Key Talking Points", styles, icon_key="talking_points", keep_with_next=tp_first)
         for i, point in enumerate(guide_content['talking_points'][1:], 2):
             story.append(_build_talking_point(i, point, styles, content_width))
-            story.append(Spacer(1, 8))
+            story.append(Spacer(1, 10))
 
     # ── Questions to Ask ──
     if guide_content.get('questions_to_ask'):
@@ -698,7 +672,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         _section_divider(story, "Questions to Ask", styles, icon_key="questions_ask", keep_with_next=qa_first)
         for q in guide_content['questions_to_ask'][1:]:
             story.append(_build_question_row(q, styles, content_width))
-            story.append(Spacer(1, 8))
+            story.append(Spacer(1, 10))
 
     # ── Prepare For These Questions (AI-generated likely interview questions) ──
     if guide_content.get('likely_questions'):
