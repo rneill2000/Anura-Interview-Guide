@@ -7,7 +7,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
 
-from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS
+from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS, _generate_recent_news
 from guide_generator.pdf_builder import build_guide_pdf
 
 # Simple in-memory status tracker (same pattern as Resume Tool)
@@ -74,6 +74,23 @@ def generate_guide(request):
         "job_title": form_data["job_title"],
         "health_system_name": form_data["health_system_name"],
     })
+
+
+@require_http_methods(["POST"])
+def fetch_news(request):
+    """AJAX endpoint: fetch recent news for a health system."""
+    import json
+    try:
+        body = json.loads(request.body)
+        health_system_name = body.get("health_system_name", "").strip()
+    except (json.JSONDecodeError, AttributeError):
+        health_system_name = request.POST.get("health_system_name", "").strip()
+
+    if not health_system_name:
+        return JsonResponse({"news": [], "error": "No health system name provided."})
+
+    news = _generate_recent_news({"health_system_name": health_system_name})
+    return JsonResponse({"news": news})
 
 
 def download_guide(request, filename):

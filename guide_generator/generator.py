@@ -70,6 +70,33 @@ DAY_OF_CHECKLIST = [
 
 # ─── AI-GENERATED CONTENT ───────────────────────────────────────────────
 
+def _call_claude_with_search(prompt: str) -> str:
+    """Call Anthropic API with web search enabled for real-time news. Falls back to regular call."""
+    if not ANTHROPIC_API_KEY:
+        logger.warning("No ANTHROPIC_API_KEY set — skipping AI generation.")
+        return ""
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        # Extract text from response (may include tool use blocks)
+        text_parts = []
+        for block in message.content:
+            if hasattr(block, 'text'):
+                text_parts.append(block.text)
+        return "\n".join(text_parts) if text_parts else ""
+    except Exception as e:
+        logger.error(f"Claude API call with search failed: {e}")
+        # Fall back to regular call without search
+        return _call_claude(prompt)
+
+
 def _call_claude(prompt: str) -> str:
     """Call Anthropic API for AI-generated content. Falls back to empty string on failure."""
     if not ANTHROPIC_API_KEY:
@@ -242,6 +269,52 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
     ]
 
 
+def _generate_recent_news(form_data: dict) -> list[dict]:
+    """AI-generated recent news about the health system using web search."""
+    prompt = f"""Search for recent news about {form_data['health_system_name']} health system.
+
+Focus on:
+- Recent organizational changes, expansions, or mergers
+- Technology implementations (especially Epic/EHR-related)
+- Awards, recognitions, or rankings
+- New facilities, services, or partnerships
+- Leadership changes
+- Financial news or strategic initiatives
+
+Return ONLY a JSON array of 3-5 news items. Each item should have:
+- "headline": A concise headline (under 100 characters)
+- "summary": A 1-2 sentence summary of the news
+- "date": Approximate date (e.g. "March 2025" or "Q1 2025") or "Recent" if unknown
+- "relevance": One sentence on why this matters for someone interviewing there
+
+Example format:
+[{{"headline": "Example Health Expands Epic Implementation", "summary": "Example Health announced...", "date": "February 2025", "relevance": "Shows the organization is investing in Epic, relevant for IT roles."}}]
+
+Return ONLY the JSON array. No markdown, no explanation."""
+
+    result = _call_claude_with_search(prompt)
+    if result:
+        try:
+            cleaned = result.strip()
+            # Try to extract JSON from the response
+            if "```" in cleaned:
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+                cleaned = cleaned.strip()
+            # Find the JSON array in the response
+            start = cleaned.find("[")
+            end = cleaned.rfind("]") + 1
+            if start >= 0 and end > start:
+                cleaned = cleaned[start:end]
+            return json.loads(cleaned)
+        except (json.JSONDecodeError, IndexError):
+            logger.warning("Could not parse AI news results, using fallback.")
+
+    # Fallback — return empty list (no news available)
+    return []
+
+
 # ─── MAIN GENERATOR ─────────────────────────────────────────────────────
 
 def generate_interview_guide(form_data: dict) -> dict:
@@ -253,6 +326,7 @@ def generate_interview_guide(form_data: dict) -> dict:
     questions_to_ask = _generate_questions_to_ask(form_data)
     likely_questions = _generate_likely_questions(form_data)
     interviewer_insights = _generate_interviewer_insights(form_data)
+    recent_news = _generate_recent_news(form_data)
 
     # Use custom interview tips from form if provided, otherwise defaults
     custom_tips_text = form_data.get("interview_tips", "").strip()
@@ -269,6 +343,7 @@ def generate_interview_guide(form_data: dict) -> dict:
         "questions_to_ask": questions_to_ask,
         "likely_questions": likely_questions,
         "interviewer_insights": interviewer_insights,
+        "recent_news": recent_news,
         "general_tips": GENERAL_TIPS,
         "interview_tips": interview_tips,
         "follow_up_tips": FOLLOW_UP_TIPS,

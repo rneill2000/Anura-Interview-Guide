@@ -316,6 +316,52 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         info = form_data['health_system_info'].replace('\n', '<br/>')
         story.append(Paragraph(info, styles['body']))
 
+    # ── Recent News ──
+    if guide_content.get('recent_news'):
+        _section_divider(story, f"Recent News: {form_data['health_system_name']}", styles)
+        story.append(Paragraph(
+            "Stay current — referencing recent events shows you've done your homework.",
+            styles['section_subtitle'],
+        ))
+        for item in guide_content['recent_news']:
+            headline = item.get('headline', '')
+            summary = item.get('summary', '')
+            date = item.get('date', '')
+            relevance = item.get('relevance', '')
+
+            # Build news card as a styled table
+            news_rows = []
+            # Headline + date row
+            date_str = f'<font color="#6b7280" size="8">  {date}</font>' if date else ''
+            news_rows.append([Paragraph(
+                f'<b>{headline}</b>{date_str}', styles['card_title']
+            )])
+            # Summary
+            if summary:
+                news_rows.append([Paragraph(summary, styles['body_small'])])
+            # Relevance (italic, teal accent)
+            if relevance:
+                relevance_style = ParagraphStyle(
+                    'NewsRelevance', parent=styles['body_small'],
+                    fontName='Helvetica-Oblique', textColor=TEAL, fontSize=8.5,
+                )
+                news_rows.append([Paragraph(f"Why it matters: {relevance}", relevance_style)])
+
+            news_card = Table(news_rows, colWidths=[content_width - 8])
+            news_card.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), LIGHT_GRAY),
+                ('ROUNDEDCORNERS', [4, 4, 4, 4]),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (0, 0), 10),
+                ('BOTTOMPADDING', (0, -1), (-1, -1), 10),
+                ('LINEBEFORE', (0, 0), (0, -1), 3, TEAL),
+            ]))
+            story.append(news_card)
+            story.append(Spacer(1, 6))
+
     # ── Your Interviewer ──
     if form_data.get('interviewer_name'):
         _section_divider(story, "Your Interviewer", styles)

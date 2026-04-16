@@ -56,6 +56,37 @@
                    placeholder="UW Health"
                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
         </div>
+        <!-- Fetch News Button -->
+        <div class="mb-4">
+            <button type="button" id="fetchNewsBtn" onclick="fetchRecentNews()"
+                    class="inline-flex items-center px-4 py-2 bg-anura-50 hover:bg-anura-100 text-anura-600 font-medium rounded-lg text-xs transition-all duration-200 border border-anura-200">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
+                </svg>
+                <span id="fetchNewsBtnText">Fetch Recent News</span>
+                <span id="fetchNewsSpinner" class="hidden">
+                    <svg class="animate-spin ml-1 h-3.5 w-3.5 text-anura-500 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </span>
+            </button>
+            <span class="text-xs text-gray-400 ml-2">Uses AI web search to find recent news about the health system</span>
+        </div>
+
+        <!-- News Results Display -->
+        <div id="newsResults" class="hidden mb-4">
+            <div class="bg-anura-50/50 border border-anura-100 rounded-lg p-4">
+                <h3 class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-3">Recent News Found</h3>
+                <div id="newsItemsContainer"></div>
+                <p class="text-xs text-gray-400 mt-2">This news will be included in the generated PDF guide.</p>
+            </div>
+        </div>
+
+        <div id="newsError" class="hidden mb-4">
+            <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2.5 rounded-lg text-xs"></div>
+        </div>
+
         <div>
             <label for="health_system_info" class="block text-sm font-medium text-gray-700 mb-1">About the Health System</label>
             <textarea id="health_system_info" name="health_system_info" rows="3"
@@ -224,5 +255,89 @@ document.getElementById('guideForm').addEventListener('submit', function() {
     btn.disabled = true;
     btn.classList.add('opacity-70', 'cursor-wait');
 });
+
+function fetchRecentNews() {
+    const healthSystemName = document.getElementById('health_system_name').value.trim();
+    if (!healthSystemName) {
+        const errorDiv = document.getElementById('newsError');
+        errorDiv.classList.remove('hidden');
+        errorDiv.querySelector('div').textContent = 'Please enter a health system name first.';
+        return;
+    }
+
+    // Show loading state
+    const btn = document.getElementById('fetchNewsBtn');
+    const btnText = document.getElementById('fetchNewsBtnText');
+    const spinner = document.getElementById('fetchNewsSpinner');
+    const errorDiv = document.getElementById('newsError');
+    const resultsDiv = document.getElementById('newsResults');
+
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-wait');
+    btnText.textContent = 'Searching...';
+    spinner.classList.remove('hidden');
+    errorDiv.classList.add('hidden');
+    resultsDiv.classList.add('hidden');
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch('{% url "fetch_news" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({ health_system_name: healthSystemName }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-wait');
+        btnText.textContent = 'Fetch Recent News';
+        spinner.classList.add('hidden');
+
+        if (data.error) {
+            errorDiv.classList.remove('hidden');
+            errorDiv.querySelector('div').textContent = data.error;
+            return;
+        }
+
+        if (data.news && data.news.length > 0) {
+            const container = document.getElementById('newsItemsContainer');
+            container.innerHTML = '';
+            data.news.forEach(function(item) {
+                const newsItem = document.createElement('div');
+                newsItem.className = 'bg-white rounded-lg p-3 mb-2 border border-gray-100';
+                newsItem.innerHTML =
+                    '<div class="flex items-start justify-between gap-2">' +
+                        '<h4 class="text-sm font-medium text-gray-800">' + escapeHtml(item.headline) + '</h4>' +
+                        '<span class="text-xs text-gray-400 whitespace-nowrap">' + escapeHtml(item.date || '') + '</span>' +
+                    '</div>' +
+                    '<p class="text-xs text-gray-600 mt-1">' + escapeHtml(item.summary) + '</p>' +
+                    (item.relevance ? '<p class="text-xs text-anura-500 mt-1 italic">' + escapeHtml(item.relevance) + '</p>' : '');
+                container.appendChild(newsItem);
+            });
+            resultsDiv.classList.remove('hidden');
+        } else {
+            errorDiv.classList.remove('hidden');
+            errorDiv.querySelector('div').textContent = 'No recent news found for "' + healthSystemName + '". The guide will still be generated without a news section.';
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-wait');
+        btnText.textContent = 'Fetch Recent News';
+        spinner.classList.add('hidden');
+        errorDiv.classList.remove('hidden');
+        errorDiv.querySelector('div').textContent = 'Failed to fetch news. Please try again.';
+        console.error('News fetch error:', err);
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+}
 </script>
 {% endblock %}

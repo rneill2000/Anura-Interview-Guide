@@ -7,4 +7,5 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("generate/", views.generate_guide, name="generate_guide"),
     path("download/<str:filename>/", views.download_guide, name="download_guide"),
+    path("fetch-news/", views.fetch_news, name="fetch_news"),
 ]
