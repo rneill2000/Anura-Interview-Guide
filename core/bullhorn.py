@@ -48,6 +48,7 @@ def _get_auth_code():
     Bullhorn allows server-to-server auth by passing username/password
     directly to the authorize endpoint with action=Login.
     """
+    logger.info("Bullhorn auth attempt: client_id=%s... username=%s", settings.BULLHORN_CLIENT_ID[:8], settings.BULLHORN_API_USERNAME)
     params = {
         "client_id": settings.BULLHORN_CLIENT_ID,
         "response_type": "code",
@@ -63,6 +64,8 @@ def _get_auth_code():
     )
     location = resp.headers.get("Location", "")
     if not location:
+        logger.error("Bullhorn auth response body: %s", resp.text[:500])
+        logger.error("Bullhorn auth response headers: %s", dict(resp.headers))
         raise BullhornError(
             f"No redirect from Bullhorn authorize (status {resp.status_code})"
         )
