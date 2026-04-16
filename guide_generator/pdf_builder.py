@@ -503,39 +503,13 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             story.append(_build_talking_point(i, q, styles, content_width))
             story.append(Spacer(1, 5))
 
-    # ── Interview Preparation (merged tips + best practices) ──
-    has_tips = guide_content.get('interview_tips')
-    has_practices = guide_content.get('general_tips')
-    if has_tips or has_practices:
-        _section_divider(story, "Interview Preparation", styles)
-        story.append(Paragraph(
-            "Review these guidelines to make a strong impression.",
-            styles['section_subtitle'],
-        ))
 
-        # Combine tips + practices, removing near-duplicates
-        all_tips = []
-        if has_tips:
-            all_tips.extend(guide_content['interview_tips'])
-        if has_practices:
-            # Only add practices that aren't already covered by tips
-            existing_lower = {t.lower()[:40] for t in all_tips}
-            for p in guide_content['general_tips']:
-                prefix = p.lower()[:40]
-                if prefix not in existing_lower:
-                    all_tips.append(p)
 
-        for tip in all_tips:
-            story.append(_build_tip_item(tip, styles, content_width))
-
-    # ── After the Interview ──
+    # ── After the Interview (compact) ──
     if guide_content.get('follow_up_tips'):
         _section_divider(story, "After the Interview", styles)
-        story.append(Paragraph(
-            "Following up well can be the difference between an offer and a close second.",
-            styles['section_subtitle'],
-        ))
-        for tip in guide_content['follow_up_tips']:
+        tips = guide_content['follow_up_tips'][:4]
+        for tip in tips:
             story.append(_build_tip_item(tip, styles, content_width))
 
     # ── Contact Footer ──
