@@ -64,8 +64,7 @@ def _get_auth_code():
     )
     location = resp.headers.get("Location", "")
     if not location:
-        logger.error("Bullhorn auth response body: %s", resp.text[:500])
-        logger.error("Bullhorn auth response headers: %s", dict(resp.headers))
+        logger.error("Bullhorn auth failed: status=%s, no redirect location", resp.status_code)
         raise BullhornError(
             f"No redirect from Bullhorn authorize (status {resp.status_code})"
         )

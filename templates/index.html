@@ -230,6 +230,29 @@
         </div>
     </div>
 
+
+    <!-- Best Practices -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Best Practices</h2>
+        <p class="text-xs text-gray-400 mb-4">Pre-filled with standard best practices — edit, add, or remove as needed. One practice per line.</p>
+        <div>
+            <label for="best_practices" class="block text-sm font-medium text-gray-700 mb-1">Best Practices for the Candidate</label>
+            <textarea id="best_practices" name="best_practices" rows="8"
+                      class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ form_data.best_practices|default:default_practices }}</textarea>
+        </div>
+    </div>
+
+    <!-- After the Interview -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">After the Interview</h2>
+        <p class="text-xs text-gray-400 mb-4">Pre-filled with follow-up tips — edit, add, or remove as needed. One tip per line.</p>
+        <div>
+            <label for="follow_up_tips" class="block text-sm font-medium text-gray-700 mb-1">Follow-Up Tips</label>
+            <textarea id="follow_up_tips" name="follow_up_tips" rows="8"
+                      class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ form_data.follow_up_tips|default:default_followup }}</textarea>
+        </div>
+    </div>
+
     <!-- Anura Connect Contact -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
         <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Anura Connect Contact</h2>

@@ -1,14 +1,13 @@
 import os
 import uuid
 import threading
-
 from django.shortcuts import render, redirect
 from django.http import FileResponse, Http404, JsonResponse
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
-
-from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS, _generate_recent_news
+from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS, GENERAL_TIPS, FOLLOW_UP_TIPS, _generate_recent_news
 from guide_generator.pdf_builder import build_guide_pdf
+
 
 # Simple in-memory status tracker (same pattern as Resume Tool)
 _generation_status = {}
@@ -27,6 +26,8 @@ def index(request):
     """Main form page."""
     return render(request, "index.html", {
         "default_tips": "\n".join(DEFAULT_INTERVIEW_TIPS),
+        "default_practices": "\n".join(GENERAL_TIPS),
+        "default_followup": "\n".join(FOLLOW_UP_TIPS),
         "bullhorn_enabled": _bullhorn_configured(),
     })
 
@@ -53,6 +54,8 @@ def generate_guide(request):
         "contact_email": request.POST.get("contact_email", "").strip(),
         "contact_phone": request.POST.get("contact_phone", "").strip(),
         "interview_tips": request.POST.get("interview_tips", "").strip(),
+        "best_practices": request.POST.get("best_practices", "").strip(),
+        "follow_up_tips": request.POST.get("follow_up_tips", "").strip(),
     }
 
     # Validate required fields
@@ -62,6 +65,9 @@ def generate_guide(request):
         return render(request, "index.html", {
             "error": f"Please fill in: {', '.join(missing)}",
             "form_data": form_data,
+            "default_tips": "\n".join(DEFAULT_INTERVIEW_TIPS),
+            "default_practices": "\n".join(GENERAL_TIPS),
+            "default_followup": "\n".join(FOLLOW_UP_TIPS),
             "bullhorn_enabled": _bullhorn_configured(),
         })
 
@@ -75,7 +81,6 @@ def generate_guide(request):
     safe_name = form_data["candidate_name"].replace(" ", "_")
     filename = f"Interview_Guide_{safe_name}_{guide_id}.pdf"
     filepath = settings.GUIDES_DIR / filename
-
     build_guide_pdf(guide_content, form_data, filepath)
 
     return render(request, "success.html", {
@@ -118,7 +123,6 @@ def bullhorn_candidate_search(request):
 
     try:
         from core.bullhorn import search_candidates, get_candidate
-
         if candidate_id:
             candidate = get_candidate(int(candidate_id))
             return JsonResponse({"ok": True, "candidate": candidate})
@@ -148,7 +152,6 @@ def bullhorn_job_search(request):
 
     try:
         from core.bullhorn import search_job_orders, get_job_order
-
         if job_id:
             jo = get_job_order(int(job_id))
             return JsonResponse({"ok": True, "job_order": jo})

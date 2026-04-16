@@ -1,8 +1,7 @@
-"""
-PDF builder for Interview Guides — Anura Connect branding.
+"""PDF builder for Interview Guides — Anura Connect branding.
 
-Uses ReportLab for polished, magazine-style output.
-Designed to match the Exact Sciences sample guide layout.
+Uses ReportLab for polished, modern output.
+Cover page + clean interior with consistent card-based design.
 """
 
 from pathlib import Path
@@ -22,22 +21,27 @@ from reportlab.lib.utils import ImageReader
 import io
 import base64
 
+
 # ─── ANURA CONNECT BRAND COLORS ────────────────────────────────────────
+
 NAVY = HexColor("#071a2c")
 NAVY_MID = HexColor("#0a2239")
 TEAL = HexColor("#1a6b8a")
 TEAL_DARK = HexColor("#145a75")
+TEAL_LIGHT = HexColor("#2a8baa")
 LIGHT_BLUE = HexColor("#e8f4f8")
 LIGHT_BLUE_2 = HexColor("#c8e4ed")
 ACCENT = HexColor("#3d8a9e")
 DARK_GRAY = HexColor("#1f2937")
 MED_GRAY = HexColor("#6b7280")
-LIGHT_GRAY = HexColor("#f3f4f6")
+LIGHT_GRAY = HexColor("#f8f9fa")
+CARD_BG = HexColor("#f1f7fa")
 WHITE = HexColor("#FFFFFF")
 BORDER_GRAY = HexColor("#e5e7eb")
+BORDER_LIGHT = HexColor("#d1d5db")
 
 PAGE_W, PAGE_H = letter
-MARGIN = 48
+MARGIN = 54
 
 
 def _styles():
@@ -57,52 +61,52 @@ def _styles():
         textColor=ACCENT,
     )
     s['section_title'] = ParagraphStyle(
-        'SectionTitle', fontName='Helvetica-Bold', fontSize=20,
-        leading=26, textColor=NAVY, spaceBefore=4, spaceAfter=6,
+        'SectionTitle', fontName='Helvetica-Bold', fontSize=18,
+        leading=24, textColor=NAVY, spaceBefore=6, spaceAfter=4,
     )
     s['section_subtitle'] = ParagraphStyle(
-        'SectionSubtitle', fontName='Helvetica', fontSize=9.5,
-        textColor=MED_GRAY, spaceAfter=14,
+        'SectionSubtitle', fontName='Helvetica', fontSize=9,
+        textColor=MED_GRAY, spaceAfter=16, leading=13,
     )
     s['role_title'] = ParagraphStyle(
-        'RoleTitle', fontName='Helvetica-Bold', fontSize=13,
-        textColor=DARK_GRAY, spaceAfter=10,
+        'RoleTitle', fontName='Helvetica-Bold', fontSize=12,
+        textColor=TEAL, spaceAfter=10,
     )
     s['body'] = ParagraphStyle(
-        'Body', fontName='Helvetica', fontSize=10,
-        leading=15, textColor=DARK_GRAY, spaceAfter=8,
+        'Body', fontName='Helvetica', fontSize=9.5,
+        leading=14.5, textColor=DARK_GRAY, spaceAfter=8,
     )
     s['body_small'] = ParagraphStyle(
-        'BodySmall', fontName='Helvetica', fontSize=9.5,
-        leading=14, textColor=DARK_GRAY, spaceAfter=4,
+        'BodySmall', fontName='Helvetica', fontSize=9,
+        leading=13.5, textColor=DARK_GRAY, spaceAfter=4,
     )
     s['interviewer_name'] = ParagraphStyle(
-        'InterviewerName', fontName='Helvetica-Bold', fontSize=15,
+        'InterviewerName', fontName='Helvetica-Bold', fontSize=14,
         textColor=TEAL, spaceAfter=3,
     )
     s['interviewer_role'] = ParagraphStyle(
-        'InterviewerRole', fontName='Helvetica-Bold', fontSize=10.5,
+        'InterviewerRole', fontName='Helvetica-Bold', fontSize=10,
         textColor=DARK_GRAY, spaceAfter=12,
     )
     s['card_title'] = ParagraphStyle(
-        'CardTitle', fontName='Helvetica-Bold', fontSize=11,
+        'CardTitle', fontName='Helvetica-Bold', fontSize=10.5,
         textColor=NAVY, spaceAfter=5,
     )
     s['card_text'] = ParagraphStyle(
-        'CardText', fontName='Helvetica', fontSize=9,
-        leading=13, textColor=DARK_GRAY,
+        'CardText', fontName='Helvetica', fontSize=8.5,
+        leading=12.5, textColor=DARK_GRAY,
     )
     s['point_text'] = ParagraphStyle(
-        'PointText', fontName='Helvetica', fontSize=10,
+        'PointText', fontName='Helvetica', fontSize=9.5,
         leading=14, textColor=DARK_GRAY,
     )
     s['question'] = ParagraphStyle(
-        'Question', fontName='Helvetica-Oblique', fontSize=10,
+        'Question', fontName='Helvetica-Oblique', fontSize=9.5,
         leading=14, textColor=DARK_GRAY, leftIndent=12,
     )
     s['tip'] = ParagraphStyle(
-        'Tip', fontName='Helvetica', fontSize=9.5,
-        leading=14, textColor=DARK_GRAY, bulletIndent=0, leftIndent=14,
+        'Tip', fontName='Helvetica', fontSize=9,
+        leading=13.5, textColor=DARK_GRAY, bulletIndent=0, leftIndent=14,
     )
     s['contact_title'] = ParagraphStyle(
         'ContactTitle', fontName='Helvetica-Bold', fontSize=12,
@@ -120,7 +124,6 @@ def _styles():
         'Footer', fontName='Helvetica', fontSize=8,
         textColor=MED_GRAY, alignment=TA_CENTER,
     )
-
     return s
 
 
@@ -196,77 +199,113 @@ def _draw_cover(canvas, doc, form_data):
 
 
 def _section_divider(story, title, styles):
-    """Add a section title with teal underline."""
-    story.append(Spacer(1, 16))
+    """Add a section title with teal accent line."""
+    story.append(Spacer(1, 20))
     story.append(Paragraph(title, styles['section_title']))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=TEAL,
-                             spaceAfter=10, spaceBefore=2))
+    story.append(HRFlowable(width="100%", thickness=2, color=TEAL,
+                             spaceAfter=8, spaceBefore=2))
 
 
 def _build_card(title, text, styles, width):
-    """Build a single essentials card as a Table."""
+    """Build a single essentials card as a Table with modern styling."""
     # Icon circle
-    d = Drawing(32, 32)
-    d.add(Circle(16, 16, 16, fillColor=NAVY, strokeColor=None))
-    d.add(String(16, 10, "✦", fontSize=14, fillColor=WHITE,
-                 textAnchor='middle', fontName='Helvetica'))
+    d = Drawing(28, 28)
+    d.add(Circle(14, 14, 14, fillColor=NAVY, strokeColor=None))
+    d.add(String(14, 8.5, "+", fontSize=14, fillColor=WHITE,
+                 textAnchor='middle', fontName='Helvetica-Bold'))
 
     content = [
         [d],
+        [Spacer(1, 4)],
         [Paragraph(f"<b>{title}</b>", styles['card_title'])],
         [Paragraph(text, styles['card_text'])],
     ]
-
     card = Table(content, colWidths=[width])
     card.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BLUE),
-        ('BOX', (0, 0), (-1, -1), 0.5, LIGHT_BLUE_2),
-        ('ROUNDEDCORNERS', [6, 6, 6, 6]),
-        ('TOPPADDING', (0, 0), (-1, -1), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
-        ('LEFTPADDING', (0, 0), (-1, -1), 14),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 14),
+        ('BACKGROUND', (0, 0), (-1, -1), CARD_BG),
+        ('BOX', (0, 0), (-1, -1), 0.75, LIGHT_BLUE_2),
+        ('ROUNDEDCORNERS', [8, 8, 8, 8]),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 16),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 16),
         ('TOPPADDING', (0, 0), (0, 0), 16),
+        ('BOTTOMPADDING', (0, -1), (-1, -1), 16),
     ]))
     return card
 
 
 def _build_talking_point(number, text, styles, width):
-    """Build a numbered talking point row."""
+    """Build a numbered talking point row with modern styling."""
     # Number circle
-    d = Drawing(22, 22)
-    d.add(Circle(11, 11, 11, fillColor=TEAL, strokeColor=None))
-    d.add(String(11, 5, str(number), fontSize=10, fillColor=WHITE,
+    d = Drawing(24, 24)
+    d.add(Circle(12, 12, 12, fillColor=TEAL, strokeColor=None))
+    d.add(String(12, 6, str(number), fontSize=10, fillColor=WHITE,
                  textAnchor='middle', fontName='Helvetica-Bold'))
 
     row = Table(
         [[d, Paragraph(text, styles['point_text'])]],
-        colWidths=[34, width - 34],
+        colWidths=[36, width - 36],
     )
     row.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), LIGHT_GRAY),
-        ('ROUNDEDCORNERS', [4, 4, 4, 4]),
+        ('ROUNDEDCORNERS', [6, 6, 6, 6]),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('TOPPADDING', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('LEFTPADDING', (0, 0), (0, 0), 10),
         ('LEFTPADDING', (1, 0), (1, 0), 6),
-        ('RIGHTPADDING', (-1, -1), (-1, -1), 12),
-        ('LINEBEFOREFLAG', (0, 0), (0, -1)),
+        ('RIGHTPADDING', (-1, -1), (-1, -1), 14),
     ]))
 
-    # Add left teal border via wrapping table
+    # Outer wrapper with left teal accent border
     outer = Table([[row]], colWidths=[width])
     outer.setStyle(TableStyle([
         ('LEFTPADDING', (0, 0), (-1, -1), 3),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
         ('TOPPADDING', (0, 0), (-1, -1), 0),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ('LINEBEFOREWIDTH', (0, 0), (0, -1)),
         ('LINEBEFORE', (0, 0), (0, -1), 3, TEAL),
     ]))
-
     return outer
+
+
+def _build_question_row(text, styles, width):
+    """Build a question row with subtle background and left accent."""
+    row = Table(
+        [[Paragraph(f"\u201c{text}\u201d", styles['question'])]],
+        colWidths=[width],
+    )
+    row.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), LIGHT_GRAY),
+        ('ROUNDEDCORNERS', [4, 4, 4, 4]),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 14),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 14),
+        ('LINEBEFORE', (0, 0), (0, -1), 2.5, ACCENT),
+    ]))
+    return row
+
+
+def _build_tip_item(text, styles, width):
+    """Build an individual tip as a clean row with checkmark."""
+    check_style = ParagraphStyle(
+        'TipCheck', parent=styles['body_small'],
+        textColor=TEAL, fontName='Helvetica-Bold', fontSize=10,
+    )
+    row = Table(
+        [[Paragraph("\u2713", check_style), Paragraph(text, styles['tip'])]],
+        colWidths=[22, width - 22],
+    )
+    row.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    return row
 
 
 def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
@@ -282,12 +321,19 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         _draw_cover(canvas, doc, cover_data)
 
     def on_later_pages(canvas, doc):
-        # Light footer on content pages
+        # Subtle teal top bar on content pages
         canvas.saveState()
+        canvas.setFillColor(TEAL)
+        canvas.rect(0, PAGE_H - 4, PAGE_W, 4, fill=1, stroke=0)
+        # Footer
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MED_GRAY)
-        canvas.drawCentredString(PAGE_W / 2, 28,
-            "Prepared by Anura Connect  |  anuraconnect.com  |  Confidential")
+        canvas.drawCentredString(PAGE_W / 2, 24,
+            "Prepared by Anura Connect  \u2502  anuraconnect.com  \u2502  Confidential")
+        # Thin footer line
+        canvas.setStrokeColor(BORDER_GRAY)
+        canvas.setLineWidth(0.5)
+        canvas.line(MARGIN, 38, PAGE_W - MARGIN, 38)
         canvas.restoreState()
 
     doc = SimpleDocTemplate(
@@ -295,7 +341,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         pagesize=letter,
         rightMargin=MARGIN,
         leftMargin=MARGIN,
-        topMargin=MARGIN,
+        topMargin=MARGIN + 8,
         bottomMargin=MARGIN + 12,
     )
 
@@ -329,17 +375,15 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             date = item.get('date', '')
             relevance = item.get('relevance', '')
 
-            # Build news card as a styled table
             news_rows = []
-            # Headline + date row
             date_str = f'<font color="#6b7280" size="8">  {date}</font>' if date else ''
             news_rows.append([Paragraph(
                 f'<b>{headline}</b>{date_str}', styles['card_title']
             )])
-            # Summary
+
             if summary:
                 news_rows.append([Paragraph(summary, styles['body_small'])])
-            # Relevance (italic, teal accent)
+
             if relevance:
                 relevance_style = ParagraphStyle(
                     'NewsRelevance', parent=styles['body_small'],
@@ -350,11 +394,11 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             news_card = Table(news_rows, colWidths=[content_width - 8])
             news_card.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), LIGHT_GRAY),
-                ('ROUNDEDCORNERS', [4, 4, 4, 4]),
+                ('ROUNDEDCORNERS', [6, 6, 6, 6]),
                 ('TOPPADDING', (0, 0), (-1, -1), 6),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('LEFTPADDING', (0, 0), (-1, -1), 12),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('LEFTPADDING', (0, 0), (-1, -1), 14),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 14),
                 ('TOPPADDING', (0, 0), (0, 0), 10),
                 ('BOTTOMPADDING', (0, -1), (-1, -1), 10),
                 ('LINEBEFORE', (0, 0), (0, -1), 3, TEAL),
@@ -365,18 +409,15 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     # ── Your Interviewer ──
     if form_data.get('interviewer_name'):
         _section_divider(story, "Your Interviewer", styles)
-
         name = form_data['interviewer_name']
         if form_data.get('interviewer_linkedin'):
             name = f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>{name}</u></a>'
         story.append(Paragraph(name, styles['interviewer_name']))
-
         if form_data.get('interviewer_title'):
             story.append(Paragraph(
                 f"Role: {form_data['interviewer_title']} at {form_data['health_system_name']}",
                 styles['interviewer_role'],
             ))
-
         if guide_content.get('interviewer_insights'):
             for para in guide_content['interviewer_insights'].strip().split('\n\n'):
                 para = para.strip()
@@ -384,7 +425,11 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                     story.append(Paragraph(para, styles['body']))
 
     # ── Pre-Interview Essentials (2x2 card grid) ──
-    _section_divider(story, "Pre-Interview Essentials", styles)
+    _section_divider(story, "Before the Interview", styles)
+    story.append(Paragraph(
+        "Complete these steps before your interview to set yourself up for success.",
+        styles['section_subtitle'],
+    ))
 
     is_virtual = any(k in form_data.get('interview_format', '').lower()
                      for k in ('video', 'zoom', 'teams', 'phone'))
@@ -392,33 +437,33 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     tech_text = ("Test your video/audio 30 minutes before the call. Ensure stable internet, "
                  "working camera, and clear microphone. Have the meeting link ready."
                  if is_virtual else
-                 "Arrive 10–15 minutes early. Know the building entrance, parking, and check-in process.")
+                 "Arrive 10\u201315 minutes early. Know the building entrance, parking, and check-in process.")
 
-    card_w = (content_width - 12) / 2
+    card_w = (content_width - 14) / 2
     cards = [
         ("Technology Check" if is_virtual else "Arrival Plan", tech_text),
         ("Company Research",
-         f"Review {form_data['health_system_name']}'s website, recent news, and structure. "
+         f"Review {form_data['health_system_name']}\u2019s website, recent news, and structure. "
          "Prepare questions about the organization."),
         ("Professional Appearance",
          "Dress in business professional attire." +
          (" Ensure your background is clean and professional." if is_virtual else "") +
-         " First impressions matter — when in doubt, overdress."),
+         " First impressions matter \u2014 when in doubt, overdress."),
         ("Materials Ready",
          "Have your resume and specific project examples accessible. "
-         "Prepare questions about the team, challenges, and 6–12 month direction."),
+         "Prepare questions about the team, challenges, and 6\u201312 month direction."),
     ]
 
     c = [_build_card(t, txt, styles, card_w) for t, txt in cards]
     grid = Table(
         [[c[0], c[1]], [c[2], c[3]]],
-        colWidths=[card_w + 6, card_w + 6],
+        colWidths=[card_w + 7, card_w + 7],
         rowHeights=None,
     )
     grid.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
@@ -433,7 +478,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         ))
         for i, point in enumerate(guide_content['talking_points'], 1):
             story.append(_build_talking_point(i, point, styles, content_width))
-            story.append(Spacer(1, 6))
+            story.append(Spacer(1, 5))
 
     # ── Questions to Ask ──
     if guide_content.get('questions_to_ask'):
@@ -443,61 +488,59 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             styles['section_subtitle'],
         ))
         for q in guide_content['questions_to_ask']:
-            story.append(Paragraph(f"\u201c{q}\u201d", styles['question']))
-            story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER_GRAY,
-                                     spaceAfter=6, spaceBefore=6))
+            story.append(_build_question_row(q, styles, content_width))
+            story.append(Spacer(1, 5))
 
     # ── Prepare For These Questions (AI-generated likely interview questions) ──
     if guide_content.get('likely_questions'):
         _section_divider(story, "Prepare For These Questions", styles)
         story.append(Paragraph(
-            "Based on the role and job description, you may be asked questions like these. Think through your answers ahead of time.",
+            "Based on the role and job description, you may be asked questions like these. "
+            "Think through your answers ahead of time.",
             styles['section_subtitle'],
         ))
         for i, q in enumerate(guide_content['likely_questions'], 1):
-            # Split question from tip if parenthetical tip exists
             story.append(_build_talking_point(i, q, styles, content_width))
-            story.append(Spacer(1, 6))
+            story.append(Spacer(1, 5))
 
-    # ── Interview Tips (recruiter-customizable) ──
-    if guide_content.get('interview_tips'):
-        _section_divider(story, "Interview Tips", styles)
-        items = []
-        for t in guide_content['interview_tips']:
-            items.append(ListItem(
-                Paragraph(t, styles['tip']),
-                bulletColor=TEAL,
-            ))
-        story.append(ListFlowable(items, bulletType='bullet',
-                                   bulletFontSize=7, leftIndent=14))
+    # ── Interview Preparation (merged tips + best practices) ──
+    has_tips = guide_content.get('interview_tips')
+    has_practices = guide_content.get('general_tips')
+    if has_tips or has_practices:
+        _section_divider(story, "Interview Preparation", styles)
+        story.append(Paragraph(
+            "Review these guidelines to make a strong impression.",
+            styles['section_subtitle'],
+        ))
 
-    # ── Interview Best Practices ──
-    if guide_content.get('general_tips'):
-        _section_divider(story, "Interview Best Practices", styles)
-        items = []
-        for t in guide_content['general_tips']:
-            items.append(ListItem(
-                Paragraph(t, styles['tip']),
-                bulletColor=TEAL,
-            ))
-        story.append(ListFlowable(items, bulletType='bullet',
-                                   bulletFontSize=7, leftIndent=14))
+        # Combine tips + practices, removing near-duplicates
+        all_tips = []
+        if has_tips:
+            all_tips.extend(guide_content['interview_tips'])
+        if has_practices:
+            # Only add practices that aren't already covered by tips
+            existing_lower = {t.lower()[:40] for t in all_tips}
+            for p in guide_content['general_tips']:
+                prefix = p.lower()[:40]
+                if prefix not in existing_lower:
+                    all_tips.append(p)
+
+        for tip in all_tips:
+            story.append(_build_tip_item(tip, styles, content_width))
 
     # ── After the Interview ──
     if guide_content.get('follow_up_tips'):
         _section_divider(story, "After the Interview", styles)
-        items = []
-        for t in guide_content['follow_up_tips']:
-            items.append(ListItem(
-                Paragraph(t, styles['tip']),
-                bulletColor=TEAL,
-            ))
-        story.append(ListFlowable(items, bulletType='bullet',
-                                   bulletFontSize=7, leftIndent=14))
+        story.append(Paragraph(
+            "Following up well can be the difference between an offer and a close second.",
+            styles['section_subtitle'],
+        ))
+        for tip in guide_content['follow_up_tips']:
+            story.append(_build_tip_item(tip, styles, content_width))
 
     # ── Contact Footer ──
     if any(form_data.get(k) for k in ('contact_name', 'contact_email', 'contact_phone')):
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 24))
         parts = []
         if form_data.get('contact_name'):
             parts.append(f"<b>{form_data['contact_name']}</b>")
@@ -508,20 +551,19 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
         contact_content = [
             [Paragraph("Your Anura Connect Contact", styles['contact_title'])],
-            [Paragraph("  |  ".join(parts), styles['contact_info'])],
-            [Paragraph("Reach out with any questions before your interview — we're here to help you succeed.",
+            [Paragraph("  \u2502  ".join(parts), styles['contact_info'])],
+            [Paragraph("Reach out with any questions before your interview \u2014 we're here to help you succeed.",
                         styles['contact_cta'])],
         ]
-
         contact_box = Table(contact_content, colWidths=[content_width])
         contact_box.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BLUE),
-            ('BOX', (0, 0), (-1, -1), 0.5, LIGHT_BLUE_2),
-            ('ROUNDEDCORNERS', [6, 6, 6, 6]),
+            ('BACKGROUND', (0, 0), (-1, -1), CARD_BG),
+            ('BOX', (0, 0), (-1, -1), 0.75, LIGHT_BLUE_2),
+            ('ROUNDEDCORNERS', [8, 8, 8, 8]),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (0, 0), 14),
-            ('BOTTOMPADDING', (0, -1), (-1, -1), 14),
+            ('TOPPADDING', (0, 0), (0, 0), 16),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 16),
             ('LEFTPADDING', (0, 0), (-1, -1), 16),
             ('RIGHTPADDING', (0, 0), (-1, -1), 16),
         ]))

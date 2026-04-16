@@ -30,7 +30,7 @@ DEFAULT_INTERVIEW_TIPS = [
     "Sign into the meeting or arrive at the location a few minutes early.",
     "Keep a glass of water and a notepad nearby.",
     "Silence your phone completely before the interview starts.",
-    "Prepare 2–3 specific examples of your work using the STAR method (Situation, Task, Action, Result).",
+    "Prepare 2–3 specific examples of your work that demonstrate relevant experience and measurable results.",
     "Research the organization beforehand — review their website, recent news, and mission statement.",
     "Make eye contact, smile, and address the interviewer by name.",
     "Be honest about what you don't know, but frame it positively and show willingness to learn.",
@@ -41,7 +41,7 @@ GENERAL_TIPS = [
     "Arrive 10–15 minutes early. If virtual, test your audio/video setup 30 minutes beforehand and have a backup plan (phone dial-in number) ready.",
     "Dress professionally — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
     "Bring multiple copies of your resume, a notepad, and a pen. Have a list of your references ready in case they ask.",
-    "Prepare 2–3 concise stories using the STAR method (Situation, Task, Action, Result) that demonstrate your relevant experience.",
+    "Prepare 2–3 concise stories that demonstrate your relevant experience, focusing on the situation, your actions, and the measurable results you achieved.",
     "Make eye contact, offer a firm handshake, and address each interviewer by name.",
     "Listen carefully to each question. It's perfectly fine to pause briefly before answering — it shows thoughtfulness.",
     "Be honest about what you don't know, but frame it positively: 'I haven't worked with that specific module, but I've done X, which is similar, and I'm a fast learner.'",
@@ -50,10 +50,10 @@ GENERAL_TIPS = [
 ]
 
 FOLLOW_UP_TIPS = [
-    "Send a personalized thank-you email within 24 hours of the interview to each person you met with.",
+    "Write a personalized thank-you note within 24 hours of the interview and send it to your Anura Connect recruiter — we'll pass it along to the hiring manager on your behalf.",
     "Reference something specific from your conversation to make it memorable.",
     "Reiterate your interest in the role and briefly mention why you'd be a great fit.",
-    "If you discussed any follow-up items (articles, references, portfolio samples), include them in your email.",
+    "If you discussed any follow-up items (articles, references, portfolio samples), include them in your note.",
     "Contact your recruiter at Anura Connect after the interview to share how it went — this helps us advocate for you.",
 ]
 
@@ -244,7 +244,7 @@ Generate 6-8 questions the interviewer is likely to ask the candidate based on t
 - Behavioral questions (e.g. "Tell me about a time when...")
 - Situational questions related to healthcare IT
 
-For each question, add a brief one-sentence tip in parentheses on how to approach the answer.
+For each question, add a brief one-sentence tip in parentheses on how to approach the answer. Do NOT reference the STAR method or any specific interview framework. Instead give practical, specific advice for that question.
 
 Return ONLY a JSON array of strings. No markdown, no explanation. Example:
 ["Question here? (Tip: Focus on specific outcomes and metrics.)"]"""
@@ -261,7 +261,7 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
 
     return [
         f"Tell me about your experience with the technologies mentioned in the {form_data['job_title']} job description. (Tip: Be specific — name the modules, tools, or systems you've worked with.)",
-        "Describe a challenging go-live or system implementation you supported. What was your role and how did you handle obstacles? (Tip: Use the STAR method — Situation, Task, Action, Result.)",
+        "Describe a challenging go-live or system implementation you supported. What was your role and how did you handle obstacles? (Tip: Walk through the situation, your specific actions, and the measurable outcome.)",
         "How do you prioritize tasks when you have multiple urgent requests from different departments? (Tip: Give a real example showing your decision-making process.)",
         f"Why are you interested in working at {form_data['health_system_name']}? (Tip: Reference something specific about the organization — their mission, recent initiatives, or growth.)",
         "How do you handle pushback from clinical end-users during a system change or workflow update? (Tip: Show empathy for the user's perspective while explaining how you drive adoption.)",
@@ -337,6 +337,26 @@ def generate_interview_guide(form_data: dict) -> dict:
         ]
     else:
         interview_tips = list(DEFAULT_INTERVIEW_TIPS)
+
+    # Use custom best practices from form if provided, otherwise defaults
+    custom_practices_text = form_data.get("best_practices", "").strip()
+    if custom_practices_text:
+        general_tips = [
+            line.strip() for line in custom_practices_text.splitlines()
+            if line.strip()
+        ]
+    else:
+        general_tips = list(GENERAL_TIPS)
+
+    # Use custom follow-up tips from form if provided, otherwise defaults
+    custom_followup_text = form_data.get("follow_up_tips", "").strip()
+    if custom_followup_text:
+        follow_up_tips = [
+            line.strip() for line in custom_followup_text.splitlines()
+            if line.strip()
+        ]
+    else:
+        follow_up_tips = list(FOLLOW_UP_TIPS)
 
     return {
         "talking_points": talking_points,
