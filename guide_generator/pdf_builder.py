@@ -41,7 +41,7 @@ BORDER_GRAY = HexColor("#e5e7eb")
 BORDER_LIGHT = HexColor("#d1d5db")
 
 PAGE_W, PAGE_H = letter
-MARGIN = 54
+MARGIN = 58
 
 
 def _styles():
@@ -61,60 +61,60 @@ def _styles():
         textColor=ACCENT,
     )
     s['section_title'] = ParagraphStyle(
-        'SectionTitle', fontName='Helvetica-Bold', fontSize=18,
-        leading=24, textColor=NAVY, spaceBefore=6, spaceAfter=4,
+        'SectionTitle', fontName='Helvetica-Bold', fontSize=20,
+        leading=26, textColor=NAVY, spaceBefore=10, spaceAfter=6,
     )
     s['section_subtitle'] = ParagraphStyle(
-        'SectionSubtitle', fontName='Helvetica', fontSize=9,
-        textColor=MED_GRAY, spaceAfter=16, leading=13,
+        'SectionSubtitle', fontName='Helvetica', fontSize=10,
+        textColor=MED_GRAY, spaceAfter=14, leading=14.5,
     )
     s['role_title'] = ParagraphStyle(
-        'RoleTitle', fontName='Helvetica-Bold', fontSize=12,
+        'RoleTitle', fontName='Helvetica-Bold', fontSize=14,
         textColor=TEAL, spaceAfter=10,
     )
     s['body'] = ParagraphStyle(
-        'Body', fontName='Helvetica', fontSize=9.5,
-        leading=14.5, textColor=DARK_GRAY, spaceAfter=8,
+        'Body', fontName='Helvetica', fontSize=10.5,
+        leading=16, textColor=DARK_GRAY, spaceAfter=10,
     )
     s['body_small'] = ParagraphStyle(
-        'BodySmall', fontName='Helvetica', fontSize=9,
-        leading=13.5, textColor=DARK_GRAY, spaceAfter=4,
+        'BodySmall', fontName='Helvetica', fontSize=9.5,
+        leading=14, textColor=DARK_GRAY, spaceAfter=5,
     )
     s['interviewer_name'] = ParagraphStyle(
-        'InterviewerName', fontName='Helvetica-Bold', fontSize=14,
-        textColor=TEAL, spaceAfter=3,
+        'InterviewerName', fontName='Helvetica-Bold', fontSize=16,
+        textColor=TEAL, spaceAfter=4,
     )
     s['interviewer_role'] = ParagraphStyle(
         'InterviewerRole', fontName='Helvetica-Bold', fontSize=10,
         textColor=DARK_GRAY, spaceAfter=12,
     )
     s['card_title'] = ParagraphStyle(
-        'CardTitle', fontName='Helvetica-Bold', fontSize=10.5,
-        textColor=NAVY, spaceAfter=5,
+        'CardTitle', fontName='Helvetica-Bold', fontSize=11.5,
+        textColor=NAVY, spaceAfter=6,
     )
     s['card_text'] = ParagraphStyle(
-        'CardText', fontName='Helvetica', fontSize=8.5,
-        leading=12.5, textColor=DARK_GRAY,
-    )
-    s['point_text'] = ParagraphStyle(
-        'PointText', fontName='Helvetica', fontSize=9.5,
+        'CardText', fontName='Helvetica', fontSize=9.5,
         leading=14, textColor=DARK_GRAY,
     )
+    s['point_text'] = ParagraphStyle(
+        'PointText', fontName='Helvetica', fontSize=10.5,
+        leading=15.5, textColor=DARK_GRAY,
+    )
     s['question'] = ParagraphStyle(
-        'Question', fontName='Helvetica-Oblique', fontSize=9.5,
-        leading=14, textColor=DARK_GRAY, leftIndent=12,
+        'Question', fontName='Helvetica-Oblique', fontSize=10.5,
+        leading=15.5, textColor=DARK_GRAY, leftIndent=12,
     )
     s['tip'] = ParagraphStyle(
-        'Tip', fontName='Helvetica', fontSize=9,
-        leading=13.5, textColor=DARK_GRAY, bulletIndent=0, leftIndent=14,
+        'Tip', fontName='Helvetica', fontSize=10,
+        leading=15, textColor=DARK_GRAY, bulletIndent=0, leftIndent=14,
     )
     s['contact_title'] = ParagraphStyle(
-        'ContactTitle', fontName='Helvetica-Bold', fontSize=12,
-        textColor=NAVY, alignment=TA_CENTER, spaceAfter=4,
+        'ContactTitle', fontName='Helvetica-Bold', fontSize=14,
+        textColor=NAVY, alignment=TA_CENTER, spaceAfter=6,
     )
     s['contact_info'] = ParagraphStyle(
-        'ContactInfo', fontName='Helvetica', fontSize=10,
-        textColor=DARK_GRAY, alignment=TA_CENTER, spaceAfter=4,
+        'ContactInfo', fontName='Helvetica', fontSize=11,
+        textColor=DARK_GRAY, alignment=TA_CENTER, spaceAfter=5,
     )
     s['contact_cta'] = ParagraphStyle(
         'ContactCta', fontName='Helvetica-Oblique', fontSize=9,
@@ -202,7 +202,7 @@ def _section_divider(story, title, styles):
     """Add a section title with teal accent line."""
     story.append(Spacer(1, 20))
     story.append(Paragraph(title, styles['section_title']))
-    story.append(HRFlowable(width="100%", thickness=2, color=TEAL,
+    story.append(HRFlowable(width="100%", thickness=2.5, color=TEAL,
                              spaceAfter=8, spaceBefore=2))
 
 
@@ -356,11 +356,16 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     jd = form_data['job_description'].replace('\n', '<br/>')
     story.append(Paragraph(jd, styles['body']))
 
-    # ── About the Health System ──
+    # ── About the Client ──
+    _section_divider(story, f"About {form_data['health_system_name']}", styles)
     if form_data.get('health_system_info'):
-        _section_divider(story, f"About {form_data['health_system_name']}", styles)
         info = form_data['health_system_info'].replace('\n', '<br/>')
         story.append(Paragraph(info, styles['body']))
+    else:
+        story.append(Paragraph(
+            f"Visit {form_data['health_system_name']}\u2019s website to learn about their mission, values, and recent initiatives before your interview.",
+            styles['body'],
+        ))
 
     # ── Recent News ──
     if guide_content.get('recent_news'):
