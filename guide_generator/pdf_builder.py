@@ -12,7 +12,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, ListFlowable, ListItem, PageBreak, Image as RLImage,
+    HRFlowable, ListFlowable, ListItem, PageBreak, Image,
     KeepTogether,
 )
 from reportlab.graphics.shapes import Drawing, Rect, Circle, String, Line
@@ -213,8 +213,8 @@ def _draw_cover(canvas, doc, form_data):
 def _section_divider(story, title, styles, icon_key=None):
     """Add a section title with optional icon and teal accent line."""
     story.append(Spacer(1, 28))
-    if icon_key and icon_key in SECTION_ICONS:
-        icon = _icon_from_b64(SECTION_ICONS[icon_key], 22, 22)
+    if icon_key:
+        icon = _section_icon(icon_key, 22)
         title_tbl = Table(
             [[icon, Paragraph(title, styles['section_title'])]],
             colWidths=[30, None],
@@ -233,10 +233,46 @@ def _section_divider(story, title, styles, icon_key=None):
                              spaceAfter=12, spaceBefore=3))
 
 
-def _icon_from_b64(b64_str, w=24, h=24):
-    """Convert a base64 PNG string to a ReportLab Image."""
-    img_data = b64mod.b64decode(b64_str)
-    return RLImage(BytesIO(img_data), width=w, height=h)
+def _section_icon(icon_key, size=20):
+    """Draw a small teal accent icon for section headers."""
+    d = Drawing(size, size)
+    r = size / 2
+    d.add(Circle(r, r, r, fillColor=TEAL, strokeColor=None))
+    # Simple white shape per section type
+    if icon_key == "the_role":
+        d.add(Rect(r-4, r-3, 8, 7, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
+        d.add(Line(r-2, r+4, r+2, r+4, strokeColor=WHITE, strokeWidth=1.2))
+    elif icon_key == "about_client":
+        d.add(Rect(r-3, r-4, 6, 9, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
+        d.add(Rect(r-1, r-1, 2, 2, fillColor=WHITE, strokeColor=None))
+        d.add(Rect(r-1, r+2, 2, 2, fillColor=WHITE, strokeColor=None))
+    elif icon_key == "news":
+        d.add(Rect(r-4, r-3, 8, 7, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
+        d.add(Line(r-2, r+1, r+2, r+1, strokeColor=WHITE, strokeWidth=1))
+        d.add(Line(r-2, r-1, r+2, r-1, strokeColor=WHITE, strokeWidth=1))
+    elif icon_key == "interviewer":
+        d.add(Circle(r, r+2, 2.5, fillColor=None, strokeColor=WHITE, strokeWidth=1.2))
+        d.add(Rect(r-4, r-5, 8, 5, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=2))
+    elif icon_key == "talking_points":
+        d.add(Rect(r-4, r-2, 8, 6, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=2))
+        d.add(Line(r-2, r+2, r+2, r+2, strokeColor=WHITE, strokeWidth=1))
+        d.add(Line(r-2, r, r+1, r, strokeColor=WHITE, strokeWidth=1))
+    elif icon_key == "questions_ask":
+        d.add(String(r, r-4, "?", fontSize=10, fillColor=WHITE, textAnchor="middle", fontName="Helvetica-Bold"))
+    elif icon_key == "likely_questions":
+        d.add(Rect(r-3, r-4, 6, 9, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
+        d.add(Line(r-1, r+2, r+1, r+2, strokeColor=WHITE, strokeWidth=1))
+        d.add(Line(r-1, r, r+1, r, strokeColor=WHITE, strokeWidth=1))
+        d.add(Line(r-1, r-2, r+1, r-2, strokeColor=WHITE, strokeWidth=1))
+    elif icon_key == "follow_up":
+        d.add(Line(r-3, r, r-1, r-3, strokeColor=WHITE, strokeWidth=1.5))
+        d.add(Line(r-1, r-3, r+4, r+3, strokeColor=WHITE, strokeWidth=1.5))
+    elif icon_key == "logistics":
+        d.add(Rect(r-4, r-3, 8, 7, fillColor=None, strokeColor=WHITE, strokeWidth=1.2, rx=1))
+        d.add(Line(r-4, r+1, r+4, r+1, strokeColor=WHITE, strokeWidth=1))
+    else:
+        d.add(String(r, r-4, "+", fontSize=10, fillColor=WHITE, textAnchor="middle", fontName="Helvetica-Bold"))
+    return d
 
 def _draw_icon(icon_type):
     """Draw a 28x28 icon for the Before the Interview cards."""
