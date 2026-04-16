@@ -176,9 +176,12 @@ def download_guide(request, filename):
     filepath = settings.GUIDES_DIR / filename
     if not filepath.exists():
         raise Http404("Guide not found.")
-    return FileResponse(
+    response = FileResponse(
         open(filepath, "rb"),
         as_attachment=True,
         filename=filename,
         content_type="application/pdf",
     )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

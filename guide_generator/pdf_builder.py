@@ -82,7 +82,7 @@ def _styles():
     )
     s['interviewer_name'] = ParagraphStyle(
         'InterviewerName', fontName='Helvetica-Bold', fontSize=16,
-        textColor=TEAL, spaceAfter=4,
+        textColor=TEAL, spaceAfter=12,
     )
     s['interviewer_role'] = ParagraphStyle(
         'InterviewerRole', fontName='Helvetica-Bold', fontSize=10,
