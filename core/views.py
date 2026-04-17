@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import uuid
 import logging
 import threading
@@ -11,6 +12,36 @@ from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIE
 from guide_generator.pdf_builder import build_guide_pdf
 
 logger = logging.getLogger(__name__)
+
+
+def _clean_pasted_text(text: str) -> str:
+    """Strip common formatting artifacts from pasted text.
+
+    Handles markdown bold/italic markers, heading hashes, smart quotes,
+    non-breaking spaces, excessive whitespace, and other copy-paste noise
+    so the PDF renders clean text.
+    """
+    if not text:
+        return text
+    # Strip markdown heading markers (## Heading → Heading)
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Strip bold/italic markers: **text** → text, __text__ → text, *text* → text
+    text = re.sub(r'\*{1,3}(.+?)\*{1,3}', r'\1', text)
+    text = re.sub(r'_{1,3}(.+?)_{1,3}', r'\1', text)
+    # Strip markdown links [text](url) → text
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+    # Replace smart/curly quotes with straight ones
+    text = text.replace('\u2018', "'").replace('\u2019', "'")
+    text = text.replace('\u201c', '"').replace('\u201d', '"')
+    # Replace non-breaking spaces with regular spaces
+    text = text.replace('\u00a0', ' ')
+    # Strip leading bullet characters (•, ‣, ◦) that aren't followed by structure
+    text = re.sub(r'^[\u2022\u2023\u25e6]\s*', '', text, flags=re.MULTILINE)
+    # Collapse runs of 3+ newlines into 2
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    # Collapse runs of 2+ spaces into 1
+    text = re.sub(r' {2,}', ' ', text)
+    return text.strip()
 
 
 def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
@@ -92,8 +123,8 @@ def _parse_interviewers(post) -> list[dict]:
         name = (post.get(f"interviewer_name_{idx}", "") or "").strip()
         title = (post.get(f"interviewer_title_{idx}", "") or "").strip()
         linkedin = (post.get(f"interviewer_linkedin_{idx}", "") or "").strip()
-        background = (post.get(f"interviewer_background_{idx}", "") or "").strip()
-        custom_notes = (post.get(f"interviewer_custom_notes_{idx}", "") or "").strip()
+        background = _clean_pasted_text(post.get(f"interviewer_background_{idx}", "") or "")
+        custom_notes = _clean_pasted_text(post.get(f"interviewer_custom_notes_{idx}", "") or "")
         if name:
             interviewers.append({
                 "name": name, "title": title, "linkedin": linkedin,
@@ -108,8 +139,8 @@ def _parse_interviewers(post) -> list[dict]:
                 "name": name,
                 "title": (post.get("interviewer_title", "") or "").strip(),
                 "linkedin": (post.get("interviewer_linkedin", "") or "").strip(),
-                "background": (post.get("interviewer_background", "") or "").strip(),
-                "custom_notes": (post.get("interviewer_custom_notes", "") or "").strip(),
+                "background": _clean_pasted_text(post.get("interviewer_background", "") or ""),
+                "custom_notes": _clean_pasted_text(post.get("interviewer_custom_notes", "") or ""),
             })
     return interviewers
 
@@ -147,13 +178,15 @@ def _parse_selected_news(post) -> list[dict] | None:
 @require_http_methods(["POST"])
 def generate_guide(request):
     """Accept form data, generate guide, return download link."""
-    # Collect form inputs
+    # Collect form inputs — _clean_pasted_text strips markdown artifacts,
+    # smart quotes, bullet chars, and excess whitespace from free-text fields.
+    _c = _clean_pasted_text
     form_data = {
         "candidate_name": request.POST.get("candidate_name", "").strip(),
         "job_title": request.POST.get("job_title", "").strip(),
-        "job_description": request.POST.get("job_description", "").strip(),
+        "job_description": _c(request.POST.get("job_description", "")),
         "health_system_name": request.POST.get("health_system_name", "").strip(),
-        "health_system_info": request.POST.get("health_system_info", "").strip(),
+        "health_system_info": _c(request.POST.get("health_system_info", "")),
         "health_system_website": request.POST.get("health_system_website", "").strip(),
         "health_system_address": request.POST.get("health_system_address", "").strip(),
         "interview_timezone": request.POST.get("interview_timezone", "CT"),
@@ -162,7 +195,7 @@ def generate_guide(request):
         "interviewer_name": request.POST.get("interviewer_name", "").strip(),
         "interviewer_title": request.POST.get("interviewer_title", "").strip(),
         "interviewer_linkedin": request.POST.get("interviewer_linkedin", "").strip(),
-        "interviewer_background": request.POST.get("interviewer_background", "").strip(),
+        "interviewer_background": _c(request.POST.get("interviewer_background", "")),
         "interview_date": request.POST.get("interview_date", "").strip(),
         "interview_time": request.POST.get("interview_time", "").strip(),
         "interview_format": request.POST.get("interview_format", "Video (Zoom/Teams)"),
@@ -170,9 +203,9 @@ def generate_guide(request):
         "contact_name": request.POST.get("contact_name", "").strip(),
         "contact_email": request.POST.get("contact_email", "").strip(),
         "contact_phone": request.POST.get("contact_phone", "").strip(),
-        "interview_tips": request.POST.get("interview_tips", "").strip(),
-        "best_practices": request.POST.get("best_practices", "").strip(),
-        "follow_up_tips": request.POST.get("follow_up_tips", "").strip(),
+        "interview_tips": _c(request.POST.get("interview_tips", "")),
+        "best_practices": _c(request.POST.get("best_practices", "")),
+        "follow_up_tips": _c(request.POST.get("follow_up_tips", "")),
     }
 
     # Validate required fields
@@ -189,10 +222,10 @@ def generate_guide(request):
         })
 
     # Pull fit-analysis text from uploaded file and/or pasted textarea
-    fit_text = _extract_fit_text(
+    fit_text = _clean_pasted_text(_extract_fit_text(
         request.FILES.get("fit_analysis_file"),
         request.POST.get("fit_analysis_text", ""),
-    )
+    ))
     uploaded = request.FILES.get("fit_analysis_file")
     logger.info(
         f"fit_analysis: uploaded={uploaded.name if uploaded else None}, "
@@ -201,10 +234,10 @@ def generate_guide(request):
     )
 
     # Pull candidate resume text the same way (same helper — file or pasted textarea)
-    resume_text = _extract_fit_text(
+    resume_text = _clean_pasted_text(_extract_fit_text(
         request.FILES.get("candidate_resume_file"),
         request.POST.get("candidate_resume_text", ""),
-    )
+    ))
     resume_uploaded = request.FILES.get("candidate_resume_file")
     logger.info(
         f"candidate_resume: uploaded={resume_uploaded.name if resume_uploaded else None}, "
