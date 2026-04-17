@@ -38,11 +38,11 @@ DEFAULT_INTERVIEW_TIPS = [
 
 GENERAL_TIPS = [
     "Research the organization thoroughly before the interview — review their website, recent news, mission statement, and any publicly available strategic plans.",
-    "Arrive 10–15 minutes early. If virtual, test your audio/video setup 30 minutes beforehand and have a backup plan (phone dial-in number) ready.",
-    "Dress professionally — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
-    "Bring multiple copies of your resume, a notepad, and a pen. Have a list of your references ready in case they ask.",
+    "Sign into the meeting 5–10 minutes early. Test your audio, video, and internet connection 30 minutes beforehand, and have a backup plan (phone dial-in number) ready in case something fails.",
+    "Dress professionally from the waist up — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
+    "Have your resume and a list of references pulled up on your screen or printed nearby so you can reference them if asked. Keep a notepad and pen handy for notes.",
     "Prepare 2–3 concise stories that demonstrate your relevant experience, focusing on the situation, your actions, and the measurable results you achieved.",
-    "Make eye contact, offer a firm handshake, and address each interviewer by name.",
+    "Look into the camera (not the screen) when speaking, smile, and address each interviewer by name.",
     "Listen carefully to each question. It's perfectly fine to pause briefly before answering — it shows thoughtfulness.",
     "Be honest about what you don't know, but frame it positively: 'I haven't worked with that specific module, but I've done X, which is similar, and I'm a fast learner.'",
     "Show enthusiasm for the role and the organization. Interviewers want to see genuine interest, not just qualifications.",
@@ -58,9 +58,10 @@ FOLLOW_UP_TIPS = [
 ]
 
 DAY_OF_CHECKLIST = [
-    "Confirm the interview time, location, and format (in-person, phone, or video).",
-    "If in-person: look up the address, parking situation, and building entrance ahead of time.",
-    "If virtual: test your internet, camera, and microphone. Close unnecessary browser tabs and apps.",
+    "Confirm the interview time and the meeting link or dial-in details. Most interviews are conducted remotely via video.",
+    "Test your internet, camera, and microphone. Close unnecessary browser tabs and apps before the meeting starts.",
+    "Choose a quiet, well-lit space with a clean background. Natural light facing you works best.",
+    "If the interview is in-person (rare): look up the address, parking situation, and building entrance ahead of time.",
     "Have a glass of water nearby.",
     "Silence your phone completely.",
     "Keep your interview guide and notes within easy reach (but don't read from them verbatim).",
