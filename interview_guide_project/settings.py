@@ -94,6 +94,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Anthropic API key for AI-generated content
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# Bullhorn API credentials
+BULLHORN_CLIENT_ID = os.environ.get("BULLHORN_CLIENT_ID", "")
+BULLHORN_CLIENT_SECRET = os.environ.get("BULLHORN_CLIENT_SECRET", "")
+BULLHORN_API_USERNAME = os.environ.get("BULLHORN_API_USERNAME", "")
+BULLHORN_API_PASSWORD = os.environ.get("BULLHORN_API_PASSWORD", "")
+
+
 # Generated guides output directory
 GUIDES_DIR = BASE_DIR / "generated_guides"
 GUIDES_DIR.mkdir(exist_ok=True)
