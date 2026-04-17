@@ -13,9 +13,9 @@ DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
 CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
+    o if o.startswith(("http://", "https://")) else f"https://{o}"
     for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
-    if origin.strip()
+    if (o := origin.strip())
 ]
 
 INSTALLED_APPS = [
