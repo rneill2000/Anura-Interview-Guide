@@ -430,6 +430,32 @@ def _build_tip_item(text, styles, width):
 
 import re as _re_module
 
+
+def _md_to_rl(text: str) -> str:
+    """Convert lightweight Markdown to ReportLab XML markup.
+
+    Handles:
+      - ## headings  → bold + slightly larger font
+      - **bold**     → <b>…</b>
+      - *italic*     → <i>…</i>  (only single * not followed by another *)
+      - Strips leading '#' from lines
+    """
+    lines = text.split('\n')
+    out = []
+    for line in lines:
+        stripped = line.strip()
+        # Heading lines: strip the leading ##+ and bold them
+        if stripped.startswith('#'):
+            stripped = _re_module.sub(r'^#+\s*', '', stripped)
+            stripped = f'<b>{stripped}</b>'
+        # Bold: **text** or __text__
+        stripped = _re_module.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', stripped)
+        stripped = _re_module.sub(r'__(.+?)__', r'<b>\1</b>', stripped)
+        # Italic: *text* (but not **)
+        stripped = _re_module.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', stripped)
+        out.append(stripped)
+    return '\n'.join(out)
+
 def _render_job_description(story, jd_text, styles, content_width):
     jd_heading = ParagraphStyle(
         'JDHeading', fontName='Helvetica-Bold', fontSize=10.5,
@@ -739,7 +765,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                 for para in iv['insights'].strip().split('\n\n'):
                     para = para.strip()
                     if para:
-                        story.append(Paragraph(para, styles['body']))
+                        story.append(Paragraph(_md_to_rl(para), styles['body']))
 
     # ── Why You're a Fit (driven by recruiter-uploaded fit analysis) ──
     fit = guide_content.get('fit_analysis') or {}
