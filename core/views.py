@@ -1,5 +1,7 @@
 import os
+import io
 import uuid
+import logging
 import threading
 from django.shortcuts import render, redirect
 from django.http import FileResponse, Http404, JsonResponse
@@ -7,6 +9,50 @@ from django.conf import settings
 from django.views.decorators.http import require_http_methods
 from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS, GENERAL_TIPS, FOLLOW_UP_TIPS, _generate_recent_news
 from guide_generator.pdf_builder import build_guide_pdf
+
+logger = logging.getLogger(__name__)
+
+
+def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
+    """
+    Pull plain text out of an uploaded fit-analysis file (PDF/DOCX/TXT) or fall
+    back to pasted text. Returns "" on failure so the rest of the guide still
+    generates cleanly.
+    """
+    pasted = (pasted_text or "").strip()
+    if not uploaded_file:
+        return pasted
+
+    name = (uploaded_file.name or "").lower()
+    try:
+        data = uploaded_file.read()
+    except Exception as e:
+        logger.warning(f"Could not read uploaded fit file: {e}")
+        return pasted
+
+    text = ""
+    try:
+        if name.endswith(".pdf"):
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
+            text = "\n".join((p.extract_text() or "") for p in reader.pages)
+        elif name.endswith(".docx"):
+            import docx  # python-docx
+            doc = docx.Document(io.BytesIO(data))
+            text = "\n".join(p.text for p in doc.paragraphs)
+        else:
+            # Treat as plain text — try utf-8, fall back to latin-1
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                text = data.decode("latin-1", errors="replace")
+    except Exception as e:
+        logger.warning(f"Could not parse fit file '{name}': {e}")
+        text = ""
+
+    # Combine parsed file text + any pasted text (pasted wins as supplement)
+    combined = "\n\n".join(t for t in (text.strip(), pasted) if t)
+    return combined
 
 
 # Simple in-memory status tracker (same pattern as Resume Tool)
@@ -51,7 +97,7 @@ def generate_guide(request):
         "interviewer_background": request.POST.get("interviewer_background", "").strip(),
         "interview_date": request.POST.get("interview_date", "").strip(),
         "interview_time": request.POST.get("interview_time", "").strip(),
-        "interview_format": request.POST.get("interview_format", "In-Person"),
+        "interview_format": request.POST.get("interview_format", "Video (Zoom/Teams)"),
         "interview_location": request.POST.get("interview_location", "").strip(),
         "contact_name": request.POST.get("contact_name", "").strip(),
         "contact_email": request.POST.get("contact_email", "").strip(),
@@ -74,11 +120,17 @@ def generate_guide(request):
             "bullhorn_enabled": _bullhorn_configured(),
         })
 
+    # Pull fit-analysis text from uploaded file and/or pasted textarea
+    fit_text = _extract_fit_text(
+        request.FILES.get("fit_analysis_file"),
+        request.POST.get("fit_analysis_text", ""),
+    )
+
     # Generate unique ID for this guide
     guide_id = str(uuid.uuid4())[:8]
 
     # Generate the guide content (AI + templates)
-    guide_content = generate_interview_guide(form_data)
+    guide_content = generate_interview_guide(form_data, fit_text=fit_text)
 
     # Build the PDF
     safe_name = form_data["candidate_name"].replace(" ", "_")

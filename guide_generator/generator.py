@@ -38,11 +38,11 @@ DEFAULT_INTERVIEW_TIPS = [
 
 GENERAL_TIPS = [
     "Research the organization thoroughly before the interview — review their website, recent news, mission statement, and any publicly available strategic plans.",
-    "Arrive 10–15 minutes early. If virtual, test your audio/video setup 30 minutes beforehand and have a backup plan (phone dial-in number) ready.",
-    "Dress professionally — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
-    "Bring multiple copies of your resume, a notepad, and a pen. Have a list of your references ready in case they ask.",
+    "Sign into the meeting 5–10 minutes early. Test your audio, video, and internet connection 30 minutes beforehand, and have a backup plan (phone dial-in number) ready in case something fails.",
+    "Dress professionally from the waist up — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
+    "Have your resume and a list of references pulled up on your screen or printed nearby so you can reference them if asked. Keep a notepad and pen handy for notes.",
     "Prepare 2–3 concise stories that demonstrate your relevant experience, focusing on the situation, your actions, and the measurable results you achieved.",
-    "Make eye contact, offer a firm handshake, and address each interviewer by name.",
+    "Look into the camera (not the screen) when speaking, smile, and address each interviewer by name.",
     "Listen carefully to each question. It's perfectly fine to pause briefly before answering — it shows thoughtfulness.",
     "Be honest about what you don't know, but frame it positively: 'I haven't worked with that specific module, but I've done X, which is similar, and I'm a fast learner.'",
     "Show enthusiasm for the role and the organization. Interviewers want to see genuine interest, not just qualifications.",
@@ -58,9 +58,10 @@ FOLLOW_UP_TIPS = [
 ]
 
 DAY_OF_CHECKLIST = [
-    "Confirm the interview time, location, and format (in-person, phone, or video).",
-    "If in-person: look up the address, parking situation, and building entrance ahead of time.",
-    "If virtual: test your internet, camera, and microphone. Close unnecessary browser tabs and apps.",
+    "Confirm the interview time and the meeting link or dial-in details. Most interviews are conducted remotely via video.",
+    "Test your internet, camera, and microphone. Close unnecessary browser tabs and apps before the meeting starts.",
+    "Choose a quiet, well-lit space with a clean background. Natural light facing you works best.",
+    "If the interview is in-person (rare): look up the address, parking situation, and building entrance ahead of time.",
     "Have a glass of water nearby.",
     "Silence your phone completely.",
     "Keep your interview guide and notes within easy reach (but don't read from them verbatim).",
@@ -269,6 +270,84 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
     ]
 
 
+def _generate_fit_analysis(form_data: dict, fit_text: str) -> dict:
+    """
+    AI-structured candidate-fit analysis based on an uploaded/pasted fit document.
+
+    Returns a dict with four keys:
+      - matched_strengths:       list of {"point": str, "evidence": str}
+      - gaps_to_address:         list of {"gap": str, "framing": str}
+      - suggested_talking_points: list[str]
+      - story_prompts:           list of {"prompt": str, "situation": str}
+
+    If no fit_text is provided, returns an empty dict (caller should skip the section).
+    """
+    if not fit_text or not fit_text.strip():
+        return {}
+
+    # Keep the prompt payload bounded — fit docs are typically 1–3 pages of text.
+    fit_excerpt = fit_text.strip()
+    if len(fit_excerpt) > 12000:
+        fit_excerpt = fit_excerpt[:12000] + "\n\n[...truncated for length...]"
+
+    prompt = f"""You are helping a healthcare IT consultant prepare for an interview.
+
+A recruiter has already prepared a "candidate fit analysis" — notes on how this candidate's background aligns with the role. Your job is to restructure and sharpen that analysis into a section the candidate will read before the interview.
+
+Role: {form_data['job_title']}
+Health System: {form_data['health_system_name']}
+
+Job Description:
+{form_data['job_description']}
+
+Recruiter's Fit Analysis (source material):
+\"\"\"
+{fit_excerpt}
+\"\"\"
+
+Produce a JSON object with exactly these four keys:
+
+1. "matched_strengths": an array of 4–6 objects, each with:
+   - "point":    a short (<=10 word) headline naming the strength (e.g., "Epic Ambulatory go-live leadership")
+   - "evidence": a 1–2 sentence specific example from their background that proves it, phrased in second person ("You led the go-live at...")
+
+2. "gaps_to_address": an array of 2–4 objects, each with:
+   - "gap":     a short (<=10 word) headline naming an area where the candidate is lighter than the JD asks for
+   - "framing": 1–2 sentences of coaching on how to honestly frame it — what adjacent experience to pivot to, what learning posture to show. Never recommend bluffing.
+
+3. "suggested_talking_points": an array of 4–6 ready-to-say sentences the candidate can weave into answers. Each should connect a specific piece of their background to a specific requirement from the JD. Write them as the candidate would say them, in first person.
+
+4. "story_prompts": an array of 3–5 objects, each with:
+   - "prompt":    a likely interview question this candidate is well-positioned to answer (e.g., "Tell me about a time you led a go-live under pressure.")
+   - "situation": 1–2 sentences pointing to the specific situation from their background they should use, written in second person ("Use the {{project}} go-live where...")
+
+Rules:
+- Only use facts present in the recruiter's fit analysis or derivable from the job description. Do NOT invent experience.
+- Be specific. Prefer concrete projects, systems, modules, and outcomes over generic adjectives.
+- Keep each text field under ~250 characters.
+- Return ONLY the JSON object. No markdown fences, no preamble."""
+
+    result = _call_claude(prompt)
+    if not result:
+        return {}
+
+    try:
+        cleaned = result.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        parsed = json.loads(cleaned)
+        # Normalize — ensure every key exists with a safe default
+        return {
+            "matched_strengths": parsed.get("matched_strengths", []) or [],
+            "gaps_to_address": parsed.get("gaps_to_address", []) or [],
+            "suggested_talking_points": parsed.get("suggested_talking_points", []) or [],
+            "story_prompts": parsed.get("story_prompts", []) or [],
+        }
+    except (json.JSONDecodeError, IndexError, KeyError, AttributeError) as e:
+        logger.warning(f"Could not parse AI fit analysis: {e}")
+        return {}
+
+
 def _generate_recent_news(form_data: dict) -> list[dict]:
     """AI-generated recent news about the health system using web search."""
     prompt = f"""Search for recent news about {form_data['health_system_name']} health system.
@@ -317,16 +396,20 @@ Return ONLY the JSON array. No markdown, no explanation."""
 
 # ─── MAIN GENERATOR ─────────────────────────────────────────────────────
 
-def generate_interview_guide(form_data: dict) -> dict:
+def generate_interview_guide(form_data: dict, fit_text: str = "") -> dict:
     """
     Generate the full interview guide content.
     Returns a dict with all sections ready for PDF rendering.
+
+    fit_text: optional text of the recruiter's candidate fit analysis. If provided,
+              a structured "Why You're a Fit" section is generated.
     """
     talking_points = _generate_talking_points(form_data)
     questions_to_ask = _generate_questions_to_ask(form_data)
     likely_questions = _generate_likely_questions(form_data)
     interviewer_insights = _generate_interviewer_insights(form_data)
     recent_news = _generate_recent_news(form_data)
+    fit_analysis = _generate_fit_analysis(form_data, fit_text)
 
     # Use custom interview tips from form if provided, otherwise defaults
     custom_tips_text = form_data.get("interview_tips", "").strip()
@@ -364,6 +447,7 @@ def generate_interview_guide(form_data: dict) -> dict:
         "likely_questions": likely_questions,
         "interviewer_insights": interviewer_insights,
         "recent_news": recent_news,
+        "fit_analysis": fit_analysis,
         "general_tips": GENERAL_TIPS,
         "interview_tips": interview_tips,
         "follow_up_tips": FOLLOW_UP_TIPS,

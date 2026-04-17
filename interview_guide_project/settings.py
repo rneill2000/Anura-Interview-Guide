@@ -12,14 +12,10 @@ DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
-_raw_origins = [
+CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
-]
-CSRF_TRUSTED_ORIGINS = [
-    o if o.startswith(('http://', 'https://')) else f'https://{o}'
-    for o in _raw_origins
 ]
 
 INSTALLED_APPS = [
@@ -92,9 +88,3 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 # Generated guides output directory
 GUIDES_DIR = BASE_DIR / "generated_guides"
 GUIDES_DIR.mkdir(exist_ok=True)
-
-# Bullhorn API credentials (same as Resume Tool)
-BULLHORN_CLIENT_ID = os.environ.get("BULLHORN_CLIENT_ID", "")
-BULLHORN_CLIENT_SECRET = os.environ.get("BULLHORN_CLIENT_SECRET", "")
-BULLHORN_API_USERNAME = os.environ.get("BULLHORN_API_USERNAME", "")
-BULLHORN_API_PASSWORD = os.environ.get("BULLHORN_API_PASSWORD", "")

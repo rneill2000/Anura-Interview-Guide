@@ -322,6 +322,55 @@ def _build_talking_point(number, text, styles, width):
     return row
 
 
+def _build_fit_item(headline, body, styles, width, accent_color=TEAL):
+    """
+    Two-line fit item: bold teal headline + body paragraph, enclosed in a
+    light card with a colored left border. Used for matched strengths, gaps,
+    and story prompts in the "Why You're a Fit" section.
+    """
+    headline_style = ParagraphStyle(
+        'FitHeadline', fontName='Helvetica-Bold', fontSize=12,
+        leading=16, textColor=accent_color, spaceAfter=4,
+    )
+    body_style = ParagraphStyle(
+        'FitBody', fontName='Helvetica', fontSize=10.5,
+        leading=15, textColor=DARK_GRAY,
+    )
+
+    inner = Table(
+        [[Paragraph(headline, headline_style)],
+         [Paragraph(body, body_style)]],
+        colWidths=[width - 6],
+    )
+    inner.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), LIGHT_GRAY),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+        ('ROUNDEDCORNERS', [4, 4, 4, 4]),
+    ]))
+
+    outer = Table([[inner]], colWidths=[width])
+    outer.setStyle(TableStyle([
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('LINEBEFORE', (0, 0), (0, -1), 3, accent_color),
+    ]))
+    return outer
+
+
+def _fit_subsection_label(text, styles):
+    """Small uppercase sub-heading used inside the Fit section."""
+    label_style = ParagraphStyle(
+        'FitLabel', fontName='Helvetica-Bold', fontSize=10.5,
+        leading=14, textColor=TEAL_DARK, spaceBefore=8, spaceAfter=8,
+    )
+    return Paragraph(text.upper(), label_style)
+
+
 def _build_question_row(text, styles, width):
     """Build a question row with subtle background and left accent."""
     row = Table(
@@ -516,25 +565,35 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     _section_divider(story, "The Role", styles, icon_key="the_role", keep_with_next=first_content)
     _render_job_description(story, form_data['job_description'], styles, content_width)
 
-    # ── About the Client ──
-    about_first = []
-    # Website and address details
-    detail_parts = []
+    # ── The Health System (About the Client) ──
+    # Only render this section if we have at least one piece of content for it.
+    about_detail_parts = []
     if form_data.get('health_system_website'):
         url = form_data['health_system_website']
-        detail_parts.append(f'<a href="{url}" color="#1a6b8a"><u>{url}</u></a>')
+        about_detail_parts.append(f'<a href="{url}" color="#1a6b8a"><u>{url}</u></a>')
     if form_data.get('health_system_address'):
-        detail_parts.append(form_data['health_system_address'])
-    if detail_parts:
-        story.append(Paragraph("  \u2502  ".join(detail_parts), styles['body']))
-    if form_data.get('health_system_info'):
-        info = form_data['health_system_info'].replace('\n', '<br/>')
-        story.append(Paragraph(info, styles['body']))
-    elif not detail_parts:
-        story.append(Paragraph(
-            f"Visit {form_data['health_system_name']}\u2019s website to learn about their mission, values, and recent initiatives before your interview.",
-            styles['body'],
-        ))
+        about_detail_parts.append(form_data['health_system_address'])
+
+    has_about_content = bool(about_detail_parts) or bool(form_data.get('health_system_info'))
+    if has_about_content or form_data.get('health_system_name'):
+        about_first = []
+        if about_detail_parts:
+            about_first.append(Paragraph("  \u2502  ".join(about_detail_parts), styles['body']))
+        _section_divider(
+            story,
+            f"The Health System: {form_data['health_system_name']}" if form_data.get('health_system_name') else "The Health System",
+            styles,
+            icon_key="health_system",
+            keep_with_next=about_first,
+        )
+        if form_data.get('health_system_info'):
+            info = form_data['health_system_info'].replace('\n', '<br/>')
+            story.append(Paragraph(info, styles['body']))
+        elif not about_detail_parts and form_data.get('health_system_name'):
+            story.append(Paragraph(
+                f"Visit {form_data['health_system_name']}\u2019s website to learn about their mission, values, and recent initiatives before your interview.",
+                styles['body'],
+            ))
 
     # ── Recent News ──
     if guide_content.get('recent_news'):
@@ -586,6 +645,15 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         if form_data.get('interviewer_linkedin'):
             name = f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>{name}</u></a>'
         interviewer_first = [Paragraph(name, styles['interviewer_name'])]
+        if form_data.get('interviewer_linkedin'):
+            linkedin_style = ParagraphStyle(
+                'InterviewerLinkedIn', fontName='Helvetica', fontSize=10,
+                textColor=TEAL, spaceAfter=10, spaceBefore=-10,
+            )
+            interviewer_first.append(Paragraph(
+                f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>View LinkedIn profile \u2192</u></a>',
+                linkedin_style,
+            ))
         if form_data.get('interviewer_title'):
             interviewer_first.append(Paragraph(
                 f"Role: {form_data['interviewer_title']} at {form_data['health_system_name']}",
@@ -597,6 +665,77 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                 para = para.strip()
                 if para:
                     story.append(Paragraph(para, styles['body']))
+
+    # ── Why You're a Fit (driven by recruiter-uploaded fit analysis) ──
+    fit = guide_content.get('fit_analysis') or {}
+    has_fit = any(fit.get(k) for k in (
+        'matched_strengths', 'gaps_to_address',
+        'suggested_talking_points', 'story_prompts',
+    ))
+    if has_fit:
+        fit_subtitle = [Paragraph(
+            "A tailored read of how your background aligns with this role \u2014 and how to bring it forward in the conversation.",
+            styles['section_subtitle'],
+        )]
+        _section_divider(story, "Why You're a Fit", styles, keep_with_next=fit_subtitle)
+
+        # Matched strengths
+        if fit.get('matched_strengths'):
+            story.append(_fit_subsection_label("Matched Strengths", styles))
+            for item in fit['matched_strengths']:
+                headline = (item.get('point') or '').strip()
+                evidence = (item.get('evidence') or '').strip()
+                if not (headline or evidence):
+                    continue
+                story.append(_build_fit_item(
+                    headline or "Strength",
+                    evidence or "",
+                    styles, content_width, accent_color=TEAL,
+                ))
+                story.append(Spacer(1, 6))
+
+        # Gaps to address
+        if fit.get('gaps_to_address'):
+            story.append(Spacer(1, 4))
+            story.append(_fit_subsection_label("Gaps to Address \u2014 How to Frame Them", styles))
+            for item in fit['gaps_to_address']:
+                headline = (item.get('gap') or '').strip()
+                framing = (item.get('framing') or '').strip()
+                if not (headline or framing):
+                    continue
+                story.append(_build_fit_item(
+                    headline or "Gap",
+                    framing or "",
+                    styles, content_width, accent_color=ACCENT,
+                ))
+                story.append(Spacer(1, 6))
+
+        # Suggested talking points
+        if fit.get('suggested_talking_points'):
+            story.append(Spacer(1, 4))
+            story.append(_fit_subsection_label("Suggested Talking Points", styles))
+            for i, point in enumerate(fit['suggested_talking_points'], 1):
+                text = (point or '').strip()
+                if not text:
+                    continue
+                story.append(_build_talking_point(i, text, styles, content_width))
+                story.append(Spacer(1, 6))
+
+        # Story prompts
+        if fit.get('story_prompts'):
+            story.append(Spacer(1, 4))
+            story.append(_fit_subsection_label("Story Prompts \u2014 Be Ready to Tell These", styles))
+            for item in fit['story_prompts']:
+                prompt_q = (item.get('prompt') or '').strip()
+                situation = (item.get('situation') or '').strip()
+                if not (prompt_q or situation):
+                    continue
+                story.append(_build_fit_item(
+                    prompt_q or "Likely question",
+                    situation or "",
+                    styles, content_width, accent_color=NAVY_MID,
+                ))
+                story.append(Spacer(1, 6))
 
     # ── Pre-Interview Essentials (2x2 card grid) ──
     logistics_subtitle = [Paragraph(
@@ -708,7 +847,6 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
     # ── Contact Footer ──
     if any(form_data.get(k) for k in ('contact_name', 'contact_email', 'contact_phone')):
-        story.append(Spacer(1, 32))
         parts = []
         if form_data.get('contact_name'):
             parts.append(f"<b>{form_data['contact_name']}</b>")
@@ -716,6 +854,8 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             parts.append(form_data['contact_email'])
         if form_data.get('contact_phone'):
             parts.append(form_data['contact_phone'])
+        # Strip any empty/whitespace-only parts that would render as a trailing separator
+        parts = [p for p in parts if p and str(p).strip()]
 
         contact_content = [
             [Paragraph("Your Anura Connect Contact", styles['contact_title'])],
@@ -735,7 +875,10 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             ('LEFTPADDING', (0, 0), (-1, -1), 16),
             ('RIGHTPADDING', (0, 0), (-1, -1), 16),
         ]))
-        story.append(contact_box)
+        # Keep the spacer and full contact box together so the box never splits
+        # across pages (which was causing the bottom to be clipped). If it
+        # doesn't fit on the current page, the whole box moves to the next.
+        story.append(KeepTogether([Spacer(1, 32), contact_box]))
 
     # Build
     doc.build(story, onFirstPage=on_first_page, onLaterPages=on_later_pages)

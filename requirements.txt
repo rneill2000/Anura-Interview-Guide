@@ -4,3 +4,5 @@ whitenoise>=6.7
 reportlab>=4.2
 anthropic>=0.40
 requests>=2.31
+pypdf>=4.0
+python-docx>=1.1
