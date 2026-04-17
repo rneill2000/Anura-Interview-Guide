@@ -148,27 +148,14 @@ def generate_guide(request):
     guide_id = str(uuid.uuid4())[:8]
 
     # Generate the guide content (AI + templates)
-    import time, traceback
-    t_gen = time.time()
-    try:
-        guide_content = generate_interview_guide(form_data, fit_text=fit_text, resume_text=resume_text)
-        logger.error(f'[generate_guide] guide content built in {round(time.time()-t_gen,2)}s')
-    except Exception as e:
-        logger.error(f'[generate_guide] EXCEPTION after {round(time.time()-t_gen,2)}s: {type(e).__name__}: {e}\n{traceback.format_exc()}')
-        return JsonResponse({'error': str(e), 'type': type(e).__name__, 'traceback': traceback.format_exc(), 'elapsed_sec': round(time.time()-t_gen,2)}, status=500)
+    guide_content = generate_interview_guide(form_data, fit_text=fit_text, resume_text=resume_text)
 
     # Build the PDF directly into memory and stream it back (avoids Railway's
     # ephemeral filesystem purging the file between generate and download).
     safe_name = form_data["candidate_name"].replace(" ", "_")
     filename = f"Interview_Guide_{safe_name}_{guide_id}.pdf"
     buffer = io.BytesIO()
-    t_pdf = time.time()
-    try:
-        build_guide_pdf(guide_content, form_data, buffer)
-        logger.error(f'[generate_guide] pdf built in {round(time.time()-t_pdf,2)}s')
-    except Exception as e:
-        logger.error(f'[generate_guide] PDF EXCEPTION after {round(time.time()-t_pdf,2)}s: {type(e).__name__}: {e}\n{traceback.format_exc()}')
-        return JsonResponse({'error': str(e), 'type': type(e).__name__, 'traceback': traceback.format_exc(), 'stage': 'pdf', 'elapsed_sec': round(time.time()-t_pdf,2)}, status=500)
+    build_guide_pdf(guide_content, form_data, buffer)
     buffer.seek(0)
 
     response = FileResponse(
