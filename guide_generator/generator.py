@@ -79,7 +79,7 @@ def _call_claude_with_search(prompt: str) -> str:
 
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=22.0)
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2000,
@@ -106,7 +106,7 @@ def _call_claude(prompt: str) -> str:
 
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=22.0)
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2000,
@@ -424,25 +424,47 @@ def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: s
     fit_text: optional text of the recruiter's candidate fit analysis. If provided,
               a structured "Why You're a Fit" section is generated.
     """
-    # Run all 6 Claude calls concurrently — they're independent and wall-clock
-    # must stay under Railway's 30s edge proxy timeout.
-    from concurrent.futures import ThreadPoolExecutor
+    # Run all 6 Claude calls concurrently. Each call has a hard 25s budget —
+    # if any single call hangs (usually web search on recent_news), fall back
+    # to its default return so Railway's 30s edge timeout can't kill the whole
+    # response.
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutTimeout
     import time as _time
     _t0 = _time.time()
-    with ThreadPoolExecutor(max_workers=6) as _ex:
-        _f_tp   = _ex.submit(_generate_talking_points,   form_data, fit_text, resume_text)
-        _f_qta  = _ex.submit(_generate_questions_to_ask, form_data)
-        _f_lq   = _ex.submit(_generate_likely_questions, form_data, fit_text, resume_text)
-        _f_ii   = _ex.submit(_generate_interviewer_insights, form_data)
-        _f_rn   = _ex.submit(_generate_recent_news,     form_data)
-        _f_fa   = _ex.submit(_generate_fit_analysis,    form_data, fit_text)
-        talking_points       = _f_tp.result()
-        questions_to_ask     = _f_qta.result()
-        likely_questions     = _f_lq.result()
-        interviewer_insights = _f_ii.result()
-        recent_news          = _f_rn.result()
-        fit_analysis         = _f_fa.result()
-    logger.error(f"[generate_interview_guide] 6 parallel Claude calls done in {round(_time.time()-_t0,2)}s")
+    _PER_CALL_TIMEOUT = 25  # seconds
+
+    def _safe(future, default, label):
+        try:
+            val = future.result(timeout=_PER_CALL_TIMEOUT)
+            logger.error(f"[{label}] ok in {round(_time.time()-_t0,2)}s")
+            return val
+        except _FutTimeout:
+            logger.error(f"[{label}] TIMED OUT after {_PER_CALL_TIMEOUT}s — using fallback")
+            future.cancel()
+            return default
+        except Exception as e:
+            logger.error(f"[{label}] EXCEPTION {type(e).__name__}: {e} — using fallback")
+            return default
+
+    _ex = ThreadPoolExecutor(max_workers=6)
+    try:
+        _f_tp  = _ex.submit(_generate_talking_points,       form_data, fit_text, resume_text)
+        _f_qta = _ex.submit(_generate_questions_to_ask,     form_data)
+        _f_lq  = _ex.submit(_generate_likely_questions,     form_data, fit_text, resume_text)
+        _f_ii  = _ex.submit(_generate_interviewer_insights, form_data)
+        _f_rn  = _ex.submit(_generate_recent_news,          form_data)
+        _f_fa  = _ex.submit(_generate_fit_analysis,         form_data, fit_text)
+
+        talking_points       = _safe(_f_tp,  [], "talking_points")
+        questions_to_ask     = _safe(_f_qta, [], "questions_to_ask")
+        likely_questions     = _safe(_f_lq,  [], "likely_questions")
+        interviewer_insights = _safe(_f_ii, "", "interviewer_insights")
+        recent_news          = _safe(_f_rn,  [], "recent_news")
+        fit_analysis         = _safe(_f_fa,  {}, "fit_analysis")
+    finally:
+        # Don't wait for any still-running futures — they can't write back anyway.
+        _ex.shutdown(wait=False, cancel_futures=True)
+    logger.error(f"[generate_interview_guide] done in {round(_time.time()-_t0,2)}s")
 
     # Use custom interview tips from form if provided, otherwise defaults
     custom_tips_text = form_data.get("interview_tips", "").strip()
