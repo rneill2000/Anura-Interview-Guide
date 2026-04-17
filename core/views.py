@@ -261,3 +261,37 @@ def download_guide(request, filename):
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["X-Content-Type-Options"] = "nosniff"
     return response
+def debug_claude(request):
+    """Diagnostic endpoint: check if Claude API is actually working."""
+    import time
+    from guide_generator import generator as gen
+
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    result = {
+        'has_api_key': bool(api_key),
+        'api_key_length': len(api_key),
+        'api_key_prefix': api_key[:10] + '...' if api_key else '',
+        'model_in_use': 'claude-sonnet-4-6',
+    }
+
+    if not api_key:
+        result['test_call'] = 'skipped — no key'
+        return JsonResponse(result)
+
+    t0 = time.time()
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=50,
+            messages=[{'role': 'user', 'content': 'Reply with exactly: PING'}],
+        )
+        result['test_call'] = msg.content[0].text
+        result['elapsed_sec'] = round(time.time() - t0, 2)
+    except Exception as e:
+        result['test_call_error'] = f'{type(e).__name__}: {e}'
+        result['elapsed_sec'] = round(time.time() - t0, 2)
+
+    logger.error(f'[debug_claude] {result}')
+    return JsonResponse(result)
