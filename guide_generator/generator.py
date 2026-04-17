@@ -118,9 +118,10 @@ def _call_claude(prompt: str) -> str:
         return ""
 
 
-def _generate_talking_points(form_data: dict, fit_text: str = "") -> list[str]:
+def _generate_talking_points(form_data: dict, fit_text: str = "", resume_text: str = "") -> list[str]:
     """AI-generated talking points tailored to the role and health system."""
     fit_block = f"\n\nRecruiter's Candidate Fit Notes (use these to pick which strengths to surface and which gaps to frame):\n{fit_text.strip()[:3500]}" if fit_text and fit_text.strip() else ""
+    resume_block = f"\n\nCandidate's Resume (use this to ground talking points in what the candidate has actually done — named modules, employers, projects, certifications):\n{resume_text.strip()[:4000]}" if resume_text and resume_text.strip() else ""
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
 
 Role: {form_data['job_title']}
@@ -130,16 +131,16 @@ Job Description:
 
 {f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
 {f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}
-{f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}{fit_block}
+{f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}{fit_block}{resume_block}
 
 Generate 5-7 specific talking points this candidate should weave into their interview answers.
 
-IMPORTANT: If "Recruiter's Candidate Fit Notes" are provided above, those notes are the PRIMARY input. Build talking points that:
-- Surface the specific strengths the recruiter called out (name them concretely, not generically)
-- Proactively frame or address the specific gaps/concerns the recruiter flagged
-- Tie those strengths/gaps back to what this role and health system actually need
+IMPORTANT: Use these inputs in priority order when shaping talking points:
+1. "Recruiter's Candidate Fit Notes" (if provided) — PRIMARY signal. Surface the specific strengths the recruiter called out, proactively frame the gaps/concerns the recruiter flagged, and tie each back to what this role and health system actually need. Name things concretely, not generically.
+2. "Candidate's Resume" (if provided) — ground every talking point in something the candidate has actually done. Reference specific employers, Epic modules, projects, certifications, or outcomes from the resume. Do not invent experience.
+3. Job description — use to judge which resume bullets/strengths are most relevant to this role.
 
-If fit notes were not provided, fall back to reasoning from the job description alone.
+If neither fit notes nor resume are provided, fall back to reasoning from the job description alone.
 
 Each point should:
 - Be directly relevant to the job description and health system
@@ -238,9 +239,10 @@ Keep it practical and actionable. No fluff. Do NOT invent biographical details �
     return result if result else ""
 
 
-def _generate_likely_questions(form_data: dict, fit_text: str = "") -> list[str]:
+def _generate_likely_questions(form_data: dict, fit_text: str = "", resume_text: str = "") -> list[str]:
     """AI-generated questions the interviewer is likely to ask, so the candidate can prepare."""
     fit_block = f"\n\nRecruiter's Candidate Fit Notes (anticipate questions that probe the gaps listed here, and questions that give the candidate a chance to surface the strengths listed here):\n{fit_text.strip()[:3500]}" if fit_text and fit_text.strip() else ""
+    resume_block = f"\n\nCandidate's Resume (anticipate resume-grounded follow-ups — employers, modules, projects, dates, gaps):\n{resume_text.strip()[:4000]}" if resume_text and resume_text.strip() else ""
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
 
 Role: {form_data['job_title']}
@@ -249,16 +251,16 @@ Job Description:
 {form_data['job_description']}
 
 {f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
-{f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}{fit_block}
+{f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}{fit_block}{resume_block}
 
 Generate 6-8 questions the interviewer is likely to ask the candidate.
 
-IMPORTANT: If "Recruiter's Candidate Fit Notes" are provided above, use them to drive the question mix:
-- Include questions that probe the specific gaps/concerns the recruiter flagged (so the candidate can rehearse answers)
-- Include questions that give the candidate a natural chance to surface the specific strengths the recruiter called out
-- Do not duplicate the fit-note text verbatim — turn each gap/strength into a plausible interviewer question
+IMPORTANT: Use these inputs in priority order when choosing questions:
+1. "Recruiter's Candidate Fit Notes" (if provided) — include questions that probe the specific gaps/concerns the recruiter flagged (so the candidate can rehearse), and questions that give the candidate a natural chance to surface the strengths the recruiter called out. Turn each gap/strength into a plausible interviewer question rather than quoting verbatim.
+2. "Candidate's Resume" (if provided) — include resume-specific follow-ups an interviewer would realistically ask: "Tell me more about [specific project]," "Walk me through your [specific module] go-live at [employer]," "Why did you leave [employer] after [short tenure]?", etc. Tie each question to a real item on the resume.
+3. Job description — use it to infer the technical/role-specific questions the interviewer will care about.
 
-Otherwise base the questions on the job description and role. Include a mix of:
+Include a mix of:
 - Technical/skill-based questions specific to the role
 - Behavioral questions (e.g. "Tell me about a time when...")
 - Situational questions related to healthcare IT
@@ -414,7 +416,7 @@ Return ONLY the JSON array. No markdown, no explanation."""
 
 # ─── MAIN GENERATOR ─────────────────────────────────────────────────────
 
-def generate_interview_guide(form_data: dict, fit_text: str = "") -> dict:
+def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: str = "") -> dict:
     """
     Generate the full interview guide content.
     Returns a dict with all sections ready for PDF rendering.
@@ -422,9 +424,9 @@ def generate_interview_guide(form_data: dict, fit_text: str = "") -> dict:
     fit_text: optional text of the recruiter's candidate fit analysis. If provided,
               a structured "Why You're a Fit" section is generated.
     """
-    talking_points = _generate_talking_points(form_data, fit_text=fit_text)
+    talking_points = _generate_talking_points(form_data, fit_text=fit_text, resume_text=resume_text)
     questions_to_ask = _generate_questions_to_ask(form_data)
-    likely_questions = _generate_likely_questions(form_data, fit_text=fit_text)
+    likely_questions = _generate_likely_questions(form_data, fit_text=fit_text, resume_text=resume_text)
     interviewer_insights = _generate_interviewer_insights(form_data)
     recent_news = _generate_recent_news(form_data)
     fit_analysis = _generate_fit_analysis(form_data, fit_text)

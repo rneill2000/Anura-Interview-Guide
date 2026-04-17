@@ -132,11 +132,23 @@ def generate_guide(request):
         f"extracted_chars={len(fit_text)}"
     )
 
+    # Pull candidate resume text the same way (same helper — file or pasted textarea)
+    resume_text = _extract_fit_text(
+        request.FILES.get("candidate_resume_file"),
+        request.POST.get("candidate_resume_text", ""),
+    )
+    resume_uploaded = request.FILES.get("candidate_resume_file")
+    logger.info(
+        f"candidate_resume: uploaded={resume_uploaded.name if resume_uploaded else None}, "
+        f"pasted_chars={len((request.POST.get('candidate_resume_text') or '').strip())}, "
+        f"extracted_chars={len(resume_text)}"
+    )
+
     # Generate unique ID for this guide
     guide_id = str(uuid.uuid4())[:8]
 
     # Generate the guide content (AI + templates)
-    guide_content = generate_interview_guide(form_data, fit_text=fit_text)
+    guide_content = generate_interview_guide(form_data, fit_text=fit_text, resume_text=resume_text)
 
     # Build the PDF directly into memory and stream it back (avoids Railway's
     # ephemeral filesystem purging the file between generate and download).
