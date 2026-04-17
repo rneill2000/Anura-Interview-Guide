@@ -95,6 +95,8 @@ def _bullhorn_configured():
     """Check whether Bullhorn API credentials are set."""
     return bool(
         getattr(settings, "BULLHORN_CLIENT_ID", "")
+        and getattr(settings, "BULLHORN_CLIENT_SECRET", "")
+        and getattr(settings, "BULLHORN_API_USERNAME", "")
         and getattr(settings, "BULLHORN_API_PASSWORD", "")
     )
 
