@@ -659,43 +659,87 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             story.append(news_card)
             story.append(Spacer(1, 10))
 
-    # ── Your Interviewer ──
-    if form_data.get('interviewer_name'):
-        name = form_data['interviewer_name']
-        if form_data.get('interviewer_linkedin'):
-            name = f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>{name}</u></a>'
-        interviewer_first = [Paragraph(name, styles['interviewer_name'])]
-        if form_data.get('interviewer_linkedin'):
-            linkedin_style = ParagraphStyle(
-                'InterviewerLinkedIn', fontName='Helvetica', fontSize=10,
-                textColor=TEAL, spaceAfter=10, spaceBefore=-10,
-            )
-            interviewer_first.append(Paragraph(
-                f'<a href="{form_data["interviewer_linkedin"]}" color="#1a6b8a"><u>View LinkedIn profile \u2192</u></a>',
+    # ── Your Interviewer(s) ──
+    # Prefer the new `interviewers` list (multi-interviewer). Fall back to the
+    # legacy single-interviewer fields on form_data for back-compat.
+    interviewer_list = guide_content.get('interviewers') or []
+    if not interviewer_list and form_data.get('interviewer_name'):
+        interviewer_list = [{
+            'name': form_data.get('interviewer_name', ''),
+            'title': form_data.get('interviewer_title', ''),
+            'linkedin': form_data.get('interviewer_linkedin', ''),
+            'background': form_data.get('interviewer_background', ''),
+            'insights': guide_content.get('interviewer_insights', ''),
+        }]
+
+    if interviewer_list:
+        section_title = "Your Interviewers" if len(interviewer_list) > 1 else "Your Interviewer"
+
+        bg_label_style = ParagraphStyle(
+            'InterviewerBgLabel', fontName='Helvetica-Bold', fontSize=10,
+            textColor=NAVY, spaceBefore=6, spaceAfter=4,
+        )
+        linkedin_style = ParagraphStyle(
+            'InterviewerLinkedIn', fontName='Helvetica', fontSize=10,
+            textColor=TEAL, spaceAfter=10, spaceBefore=-10,
+        )
+        subhead_style = ParagraphStyle(
+            'InterviewerSubhead', fontName='Helvetica-Bold', fontSize=13,
+            textColor=TEAL, spaceBefore=18, spaceAfter=10,
+        )
+
+        # Build the first block so the section divider can keep-with-next.
+        first = interviewer_list[0]
+        first_name = first.get('name', '')
+        if first.get('linkedin'):
+            first_name_disp = f'<a href="{first["linkedin"]}" color="#1a6b8a"><u>{first_name}</u></a>'
+        else:
+            first_name_disp = first_name
+        first_block = [Paragraph(first_name_disp, styles['interviewer_name'])]
+        if first.get('linkedin'):
+            first_block.append(Paragraph(
+                f'<a href="{first["linkedin"]}" color="#1a6b8a"><u>View LinkedIn profile \u2192</u></a>',
                 linkedin_style,
             ))
-        if form_data.get('interviewer_title'):
-            interviewer_first.append(Paragraph(
-                f"Role: {form_data['interviewer_title']} at {form_data['health_system_name']}",
+        if first.get('title'):
+            first_block.append(Paragraph(
+                f"Role: {first['title']} at {form_data['health_system_name']}",
                 styles['interviewer_role'],
             ))
-        _section_divider(story, "Your Interviewer", styles, icon_key="interviewer", keep_with_next=interviewer_first)
-        if form_data.get('interviewer_background'):
-            bg_label_style = ParagraphStyle(
-                'InterviewerBgLabel', fontName='Helvetica-Bold', fontSize=10,
-                textColor=NAVY, spaceBefore=6, spaceAfter=4,
-            )
-            story.append(Paragraph("Recruiter notes about this interviewer:", bg_label_style))
-            for para in form_data['interviewer_background'].strip().split('\n\n'):
-                para = para.strip()
-                if para:
-                    story.append(Paragraph(para, styles['body']))
-            story.append(Spacer(1, 6))
-        if guide_content.get('interviewer_insights'):
-            for para in guide_content['interviewer_insights'].strip().split('\n\n'):
-                para = para.strip()
-                if para:
-                    story.append(Paragraph(para, styles['body']))
+        _section_divider(story, section_title, styles, icon_key="interviewer", keep_with_next=first_block)
+
+        # Now render each interviewer (first already has its header via first_block)
+        for idx, iv in enumerate(interviewer_list):
+            if idx > 0:
+                # Subsequent interviewers: render their own header inline
+                name_disp = iv.get('name', '')
+                if iv.get('linkedin'):
+                    name_disp = f'<a href="{iv["linkedin"]}" color="#1a6b8a"><u>{name_disp}</u></a>'
+                story.append(Paragraph(name_disp, subhead_style))
+                if iv.get('linkedin'):
+                    story.append(Paragraph(
+                        f'<a href="{iv["linkedin"]}" color="#1a6b8a"><u>View LinkedIn profile \u2192</u></a>',
+                        linkedin_style,
+                    ))
+                if iv.get('title'):
+                    story.append(Paragraph(
+                        f"Role: {iv['title']} at {form_data['health_system_name']}",
+                        styles['interviewer_role'],
+                    ))
+
+            if iv.get('background'):
+                story.append(Paragraph("Recruiter notes about this interviewer:", bg_label_style))
+                for para in iv['background'].strip().split('\n\n'):
+                    para = para.strip()
+                    if para:
+                        story.append(Paragraph(para, styles['body']))
+                story.append(Spacer(1, 6))
+
+            if iv.get('insights'):
+                for para in iv['insights'].strip().split('\n\n'):
+                    para = para.strip()
+                    if para:
+                        story.append(Paragraph(para, styles['body']))
 
     # ── Why You're a Fit (driven by recruiter-uploaded fit analysis) ──
     fit = guide_content.get('fit_analysis') or {}

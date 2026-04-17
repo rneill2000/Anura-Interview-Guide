@@ -212,18 +212,29 @@ Return ONLY a JSON array of strings. No markdown, no explanation."""
     ]
 
 
-def _generate_interviewer_insights(form_data: dict) -> str:
-    """AI-generated insights about the interviewer based on provided info."""
-    if not form_data.get("interviewer_name"):
+def _generate_interviewer_insights(form_data: dict, interviewer: dict | None = None) -> str:
+    """AI-generated insights about ONE interviewer based on provided info.
+
+    If `interviewer` is passed, uses those fields (for multi-interviewer support).
+    Otherwise falls back to the legacy single-interviewer fields on form_data.
+    """
+    if interviewer is None:
+        interviewer = {
+            "name": form_data.get("interviewer_name", ""),
+            "title": form_data.get("interviewer_title", ""),
+            "linkedin": form_data.get("interviewer_linkedin", ""),
+            "background": form_data.get("interviewer_background", ""),
+        }
+    if not (interviewer.get("name") or "").strip():
         return ""
 
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
 
 The candidate will be interviewing with:
-Name: {form_data['interviewer_name']}
-Title: {form_data.get('interviewer_title', 'Not provided')}
-LinkedIn: {form_data.get('interviewer_linkedin', 'Not provided')}
-Background notes: {form_data.get('interviewer_background', 'Not provided')}
+Name: {interviewer.get('name', '')}
+Title: {interviewer.get('title') or 'Not provided'}
+LinkedIn: {interviewer.get('linkedin') or 'Not provided'}
+Background notes: {interviewer.get('background') or 'Not provided'}
 
 Health System: {form_data['health_system_name']}
 Role being interviewed for: {form_data['job_title']}
@@ -240,35 +251,41 @@ Keep it practical and actionable. No fluff. Do NOT invent biographical details �
 
 
 def _generate_likely_questions(form_data: dict, fit_text: str = "", resume_text: str = "") -> list[str]:
-    """AI-generated questions the interviewer is likely to ask, so the candidate can prepare."""
-    fit_block = f"\n\nRecruiter's Candidate Fit Notes (anticipate questions that probe the gaps listed here, and questions that give the candidate a chance to surface the strengths listed here):\n{fit_text.strip()[:3500]}" if fit_text and fit_text.strip() else ""
-    resume_block = f"\n\nCandidate's Resume (anticipate resume-grounded follow-ups — employers, modules, projects, dates, gaps):\n{resume_text.strip()[:4000]}" if resume_text and resume_text.strip() else ""
+    """AI-generated questions the interviewer is likely to ask, so the candidate can prepare.
+
+    Priority: ground questions in the resume ↔ job-description match. Interviewer
+    background is flavor, not the main driver — the recruiter fed it back to us
+    because too many questions were leaning on it.
+    """
+    fit_block = f"\n\nRecruiter's Candidate Fit Notes (supplementary — use to reinforce strengths/gaps the recruiter has already identified):\n{fit_text.strip()[:3500]}" if fit_text and fit_text.strip() else ""
+    resume_block = f"\n\nCandidate's Resume (PRIMARY source of truth for the candidate's background):\n{resume_text.strip()[:4000]}" if resume_text and resume_text.strip() else ""
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
 
 Role: {form_data['job_title']}
 Health System: {form_data['health_system_name']}
 Job Description:
 {form_data['job_description']}
+{resume_block}{fit_block}
 
-{f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
-{f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}{fit_block}{resume_block}
+{f"(Interviewer is {form_data['interviewer_name']}, {form_data['interviewer_title']} — useful flavor but DO NOT let it dominate the questions.)" if form_data.get('interviewer_name') else ""}
 
 Generate 6-8 questions the interviewer is likely to ask the candidate.
 
-IMPORTANT: Use these inputs in priority order when choosing questions:
-1. "Recruiter's Candidate Fit Notes" (if provided) — include questions that probe the specific gaps/concerns the recruiter flagged (so the candidate can rehearse), and questions that give the candidate a natural chance to surface the strengths the recruiter called out. Turn each gap/strength into a plausible interviewer question rather than quoting verbatim.
-2. "Candidate's Resume" (if provided) — include resume-specific follow-ups an interviewer would realistically ask: "Tell me more about [specific project]," "Walk me through your [specific module] go-live at [employer]," "Why did you leave [employer] after [short tenure]?", etc. Tie each question to a real item on the resume.
-3. Job description — use it to infer the technical/role-specific questions the interviewer will care about.
+PRIORITY ORDER — follow strictly:
+1. **Resume ↔ Job Description match** (PRIMARY). For each major requirement in the JD, ask the question an interviewer would most naturally ask to test whether the candidate has genuinely done that thing. Anchor each question in a specific item on the candidate's resume: a named module, employer, project, outcome, certification, or date. "Walk me through your Cadence template redesign at [employer]" is great; "Tell me about your experience" is not.
+2. **JD-only questions** where the resume doesn't obviously cover a requirement — ask the question that would give the candidate a chance to address that gap.
+3. **Recruiter's fit notes** (if provided) — use to reinforce 1-2 questions around the specific strengths or gaps the recruiter already flagged.
+4. **Interviewer background** — flavor only. Do NOT generate questions just because of who the interviewer is. The questions this role would ask are driven by the role, not the person. At most one question may lean into the interviewer's perspective.
 
 Include a mix of:
-- Technical/skill-based questions specific to the role
-- Behavioral questions (e.g. "Tell me about a time when...")
-- Situational questions related to healthcare IT
+- Resume-grounded technical questions that map to JD requirements (MOST of the questions)
+- 1-2 behavioral questions tied to outcomes on the resume
+- 1 situational question about a healthcare-IT scenario relevant to the JD
 
-For each question, add a brief one-sentence tip in parentheses on how to approach the answer. Do NOT reference the STAR method or any specific interview framework. Instead give practical, specific advice for that question.
+For each question, add a brief one-sentence tip in parentheses on how to approach the answer. Tips should reference the specific resume item the candidate should use in their answer whenever possible. Do NOT reference the STAR method or any specific interview framework.
 
 Return ONLY a JSON array of strings. No markdown, no explanation. Example:
-["Question here? (Tip: Focus on specific outcomes and metrics.)"]"""
+["Walk me through the Cadence template redesign you led at Advocate Aurora — what were the specific changes and what was the measured impact? (Tip: Quantify the 18% no-show reduction and name the clinics, don't generalize.)"]"""
 
     result = _call_claude(prompt)
     if result:
@@ -369,8 +386,19 @@ Rules:
 
 
 def _generate_recent_news(form_data: dict) -> list[dict]:
-    """AI-generated recent news about the health system using web search."""
+    """AI-generated recent news about the health system using web search.
+
+    Constrained to news from the last 6 months and capped at 3 items — the
+    recruiter previews these before they land in the PDF, so fewer, fresher
+    items beat a long stale list.
+    """
+    from datetime import date, timedelta
+    today = date.today()
+    cutoff = today - timedelta(days=183)  # ~6 months
     prompt = f"""Search for recent news about {form_data['health_system_name']} health system.
+
+STRICT DATE FILTER: Only include news items published on or after {cutoff.isoformat()} (the last 6 months, as of {today.isoformat()}).
+Do NOT include anything older than {cutoff.isoformat()}, even if it's well-known or commonly cited. If you can't confirm the publication date is within the last 6 months, omit that item.
 
 Focus on:
 - Recent organizational changes, expansions, or mergers
@@ -380,16 +408,17 @@ Focus on:
 - Leadership changes
 - Financial news or strategic initiatives
 
-Return ONLY a JSON array of 3-5 news items. Each item should have:
+Return AT MOST 3 news items (fewer is fine — prefer quality over quantity).
+Each item should have:
 - "headline": A concise headline (under 100 characters)
 - "summary": A 1-2 sentence summary of the news
-- "date": Approximate date (e.g. "March 2025" or "Q1 2025") or "Recent" if unknown
+- "date": Specific publication date in "Month YYYY" form (e.g. "February 2026"). If you can't pin down the date to within 6 months, DO NOT include the item.
 - "relevance": One sentence on why this matters for someone interviewing there
 
 Example format:
-[{{"headline": "Example Health Expands Epic Implementation", "summary": "Example Health announced...", "date": "February 2025", "relevance": "Shows the organization is investing in Epic, relevant for IT roles."}}]
+[{{"headline": "Example Health Expands Epic Implementation", "summary": "Example Health announced...", "date": "February 2026", "relevance": "Shows the organization is investing in Epic, relevant for IT roles."}}]
 
-Return ONLY the JSON array. No markdown, no explanation."""
+Return ONLY the JSON array (max 3 items). No markdown, no explanation."""
 
     result = _call_claude_with_search(prompt)
     if result:
@@ -406,7 +435,9 @@ Return ONLY the JSON array. No markdown, no explanation."""
             end = cleaned.rfind("]") + 1
             if start >= 0 and end > start:
                 cleaned = cleaned[start:end]
-            return json.loads(cleaned)
+            parsed = json.loads(cleaned)
+            # Hard cap at 3 in case the model overshoots.
+            return parsed[:3] if isinstance(parsed, list) else []
         except (json.JSONDecodeError, IndexError):
             logger.warning("Could not parse AI news results, using fallback.")
 
@@ -416,32 +447,71 @@ Return ONLY the JSON array. No markdown, no explanation."""
 
 # ─── MAIN GENERATOR ─────────────────────────────────────────────────────
 
-def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: str = "") -> dict:
+def generate_interview_guide(
+    form_data: dict,
+    fit_text: str = "",
+    resume_text: str = "",
+    interviewers: list[dict] | None = None,
+    selected_news: list[dict] | None = None,
+) -> dict:
     """
     Generate the full interview guide content.
     Returns a dict with all sections ready for PDF rendering.
 
     fit_text: optional text of the recruiter's candidate fit analysis. If provided,
               a structured "Why You're a Fit" section is generated.
+    interviewers: optional list of interviewer dicts, each with keys name/title/linkedin/background/custom_notes.
+              If omitted, falls back to the legacy single-interviewer fields on form_data.
+    selected_news: optional list of news item dicts the recruiter already previewed and approved.
+              If provided, we use those verbatim and SKIP the news-generation call entirely
+              (keeps news out of the 25s critical path).
     """
-    # Run all 6 Claude calls concurrently with a SHARED 25s deadline. If the
-    # whole batch doesn't finish in 25s, any unfinished future falls back to
-    # its default return value. This keeps wall-clock under Railway's 30s.
+    # Normalize interviewers — fall back to legacy single-interviewer form_data fields.
+    if interviewers is None:
+        legacy = {
+            "name": form_data.get("interviewer_name", ""),
+            "title": form_data.get("interviewer_title", ""),
+            "linkedin": form_data.get("interviewer_linkedin", ""),
+            "background": form_data.get("interviewer_background", ""),
+            "custom_notes": "",
+        }
+        interviewers = [legacy] if (legacy["name"] or "").strip() else []
+
+    # Drop interviewers without a name; cap at 5 so the fan-out stays bounded.
+    interviewers = [i for i in interviewers if (i.get("name") or "").strip()][:5]
+
+    # Run Claude calls concurrently with a SHARED 25s deadline. If the whole
+    # batch doesn't finish in 25s, any unfinished future falls back to its
+    # default return value. This keeps wall-clock under Railway's 30s.
     from concurrent.futures import ThreadPoolExecutor
     import time as _time
     _t0 = _time.time()
     _DEADLINE = 25  # total seconds for the whole parallel phase
 
-    _ex = ThreadPoolExecutor(max_workers=6)
+    # Max parallel workers: 5 core calls + up to 5 per-interviewer insight calls
+    # (news is skipped when recruiter pre-selected items, so not counted here).
+    _ex = ThreadPoolExecutor(max_workers=10)
     try:
-        futures = {
-            "talking_points":       (_ex.submit(_generate_talking_points,       form_data, fit_text, resume_text), []),
-            "questions_to_ask":     (_ex.submit(_generate_questions_to_ask,     form_data), []),
-            "likely_questions":     (_ex.submit(_generate_likely_questions,     form_data, fit_text, resume_text), []),
-            "interviewer_insights": (_ex.submit(_generate_interviewer_insights, form_data), ""),
-            "recent_news":          (_ex.submit(_generate_recent_news,          form_data), []),
-            "fit_analysis":         (_ex.submit(_generate_fit_analysis,         form_data, fit_text), {}),
+        futures: dict[str, tuple] = {
+            "talking_points":   (_ex.submit(_generate_talking_points,   form_data, fit_text, resume_text), []),
+            "questions_to_ask": (_ex.submit(_generate_questions_to_ask, form_data), []),
+            "likely_questions": (_ex.submit(_generate_likely_questions, form_data, fit_text, resume_text), []),
+            "fit_analysis":     (_ex.submit(_generate_fit_analysis,     form_data, fit_text), {}),
         }
+
+        # Per-interviewer insights — skip ones that have custom_notes already
+        # (recruiter already edited, no need to spend a Claude call on them).
+        insight_labels = []
+        for idx, iv in enumerate(interviewers):
+            if (iv.get("custom_notes") or "").strip():
+                continue  # will use custom_notes verbatim; no Claude call needed
+            label = f"interviewer_insights_{idx}"
+            insight_labels.append((idx, label))
+            futures[label] = (_ex.submit(_generate_interviewer_insights, form_data, iv), "")
+
+        # News: only regenerate if recruiter didn't already preview-and-select.
+        if selected_news is None:
+            futures["recent_news"] = (_ex.submit(_generate_recent_news, form_data), [])
 
         def _remaining():
             return max(0.1, _DEADLINE - (_time.time() - _t0))
@@ -455,16 +525,31 @@ def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: s
                 logger.error(f"[{label}] {type(e).__name__} at t={round(_time.time()-_t0,2)}s — fallback")
                 results[label] = default
 
-        talking_points       = results["talking_points"]
-        questions_to_ask     = results["questions_to_ask"]
-        likely_questions     = results["likely_questions"]
-        interviewer_insights = results["interviewer_insights"]
-        recent_news          = results["recent_news"]
-        fit_analysis         = results["fit_analysis"]
+        talking_points   = results["talking_points"]
+        questions_to_ask = results["questions_to_ask"]
+        likely_questions = results["likely_questions"]
+        fit_analysis     = results["fit_analysis"]
+
+        # Attach each interviewer's insights (custom_notes wins if present)
+        for iv in interviewers:
+            iv["insights"] = (iv.get("custom_notes") or "").strip()
+        for idx, label in insight_labels:
+            interviewers[idx]["insights"] = results.get(label, "") or ""
+
+        # News: selected_news takes priority; else use generated; else empty.
+        if selected_news is not None:
+            recent_news = selected_news[:3]
+        else:
+            recent_news = results.get("recent_news", [])
     finally:
         # Fire-and-forget any stragglers — we're past the deadline.
         _ex.shutdown(wait=False, cancel_futures=True)
     logger.error(f"[generate_interview_guide] done in {round(_time.time()-_t0,2)}s")
+
+    # Back-compat: keep the old single-interviewer "interviewer_insights" key
+    # populated with the first interviewer's insights so any legacy callers /
+    # templates don't break.
+    interviewer_insights = interviewers[0]["insights"] if interviewers else ""
 
     # Use custom interview tips from form if provided, otherwise defaults
     custom_tips_text = form_data.get("interview_tips", "").strip()
@@ -500,7 +585,8 @@ def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: s
         "talking_points": talking_points,
         "questions_to_ask": questions_to_ask,
         "likely_questions": likely_questions,
-        "interviewer_insights": interviewer_insights,
+        "interviewer_insights": interviewer_insights,  # legacy single-interviewer (back-compat)
+        "interviewers": interviewers,                  # new: list of {name,title,linkedin,background,insights}
         "recent_news": recent_news,
         "fit_analysis": fit_analysis,
         "general_tips": GENERAL_TIPS,

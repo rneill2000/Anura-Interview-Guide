@@ -12,19 +12,10 @@ DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
-def _normalize_csrf_origin(o):
-    o = o.strip()
-    if not o:
-        return None
-    if o.startswith('http://') or o.startswith('https://'):
-        return o
-    return 'https://' + o
-
 CSRF_TRUSTED_ORIGINS = [
-    o for o in (
-        _normalize_csrf_origin(raw)
-        for raw in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
-    ) if o
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
 ]
 
 INSTALLED_APPS = [
@@ -93,13 +84,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Anthropic API key for AI-generated content
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-
-# Bullhorn API credentials
-BULLHORN_CLIENT_ID = os.environ.get("BULLHORN_CLIENT_ID", "")
-BULLHORN_CLIENT_SECRET = os.environ.get("BULLHORN_CLIENT_SECRET", "")
-BULLHORN_API_USERNAME = os.environ.get("BULLHORN_API_USERNAME", "")
-BULLHORN_API_PASSWORD = os.environ.get("BULLHORN_API_PASSWORD", "")
-
 
 # Generated guides output directory
 GUIDES_DIR = BASE_DIR / "generated_guides"

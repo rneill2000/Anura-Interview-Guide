@@ -146,15 +146,19 @@
         <!-- News Results Display -->
         <div id="newsResults" class="hidden mb-4">
             <div class="bg-anura-50/50 border border-anura-100 rounded-lg p-4">
-                <h3 class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-3">Recent News Found</h3>
+                <h3 class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-1">Recent News Suggestions (last 6 months, max 3)</h3>
+                <p class="text-xs text-gray-500 mb-3">Check the items you want included in the PDF. Unchecked items are dropped. If you don't preview news at all, no news section will appear.</p>
                 <div id="newsItemsContainer"></div>
-                <p class="text-xs text-gray-400 mt-2">This news will be included in the generated PDF guide.</p>
+                <p class="text-xs text-gray-400 mt-2">News won't regenerate at PDF time — whatever you check here is what ships.</p>
             </div>
         </div>
 
         <div id="newsError" class="hidden mb-4">
             <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2.5 rounded-lg text-xs"></div>
         </div>
+
+        <!-- Hidden field: the JSON-serialized recruiter-approved news items -->
+        <input type="hidden" id="selected_news_json" name="selected_news_json" value="">
 
         <div>
             <label for="health_system_info" class="block text-sm font-medium text-gray-700 mb-1">About the Health System</label>
@@ -203,39 +207,66 @@
         </div>
     </div>
 
-    <!-- Interviewer Details -->
+    <!-- Interviewer Details — supports multiple interviewers -->
     <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
-        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Interviewer Details</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-                <label for="interviewer_name" class="block text-sm font-medium text-gray-700 mb-1">Interviewer Name</label>
-                <input type="text" id="interviewer_name" name="interviewer_name"
-                       value="{{ form_data.interviewer_name|default:'' }}"
-                       placeholder="Dr. Sarah Johnson"
-                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide">Interviewer Details</h2>
+            <button type="button" id="addInterviewerBtn"
+                    class="text-anura-600 text-sm font-medium hover:text-anura-700 transition flex items-center gap-1">
+                <span class="text-lg leading-none">+</span> Add another interviewer
+            </button>
+        </div>
+        <p class="text-xs text-gray-400 mb-4">Add each person the candidate will meet. Up to 5. For each, you can paste background and optionally preview + edit AI-suggested notes.</p>
+
+        <div id="interviewersContainer"></div>
+
+        <!-- Template (hidden) for each interviewer row. JS clones this. -->
+        <template id="interviewerTemplate">
+            <div class="interviewer-row border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide interviewer-label">Interviewer 1</p>
+                    <button type="button" class="removeInterviewerBtn text-xs text-red-500 hover:text-red-600 hidden">Remove</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" data-field="name"
+                               placeholder="Dr. Sarah Johnson"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                        <input type="text" data-field="title"
+                               placeholder="VP of Clinical Informatics"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">LinkedIn URL</label>
+                    <input type="url" data-field="linkedin"
+                           placeholder="https://linkedin.com/in/..."
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Background Notes (what you already know)</label>
+                    <textarea data-field="background" rows="2"
+                              placeholder="Copy/paste from LinkedIn, past interactions, etc."
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y"></textarea>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-medium text-gray-700">Custom notes for the guide (editable)</label>
+                        <button type="button" class="previewNotesBtn text-xs text-anura-600 font-medium hover:text-anura-700 transition">
+                            Preview AI-drafted notes
+                        </button>
+                    </div>
+                    <textarea data-field="custom_notes" rows="4"
+                              placeholder="Leave blank to let AI auto-generate. Or click 'Preview' above, then edit the draft here — whatever you leave in this box goes into the PDF verbatim."
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y"></textarea>
+                    <p class="preview-status text-xs text-gray-400 mt-1 hidden"></p>
+                </div>
             </div>
-            <div>
-                <label for="interviewer_title" class="block text-sm font-medium text-gray-700 mb-1">Interviewer Title</label>
-                <input type="text" id="interviewer_title" name="interviewer_title"
-                       value="{{ form_data.interviewer_title|default:'' }}"
-                       placeholder="VP of Clinical Informatics"
-                       class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
-            </div>
-        </div>
-        <div class="mb-4">
-            <label for="interviewer_linkedin" class="block text-sm font-medium text-gray-700 mb-1">Interviewer LinkedIn URL</label>
-            <input type="url" id="interviewer_linkedin" name="interviewer_linkedin"
-                   value="{{ form_data.interviewer_linkedin|default:'' }}"
-                   placeholder="https://linkedin.com/in/..."
-                   class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
-        </div>
-        <div>
-            <label for="interviewer_background" class="block text-sm font-medium text-gray-700 mb-1">Interviewer Background Notes</label>
-            <textarea id="interviewer_background" name="interviewer_background" rows="3"
-                      placeholder="Anything you know — their background, focus areas, what they care about..."
-                      class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ form_data.interviewer_background|default:'' }}</textarea>
-            <p class="text-xs text-gray-400 mt-1">Copy/paste from their LinkedIn profile, notes from previous interactions, etc.</p>
-        </div>
+        </template>
     </div>
 
     <!-- Interview Logistics -->
@@ -438,22 +469,32 @@ function fetchRecentNews() {
         if (data.news && data.news.length > 0) {
             const container = document.getElementById('newsItemsContainer');
             container.innerHTML = '';
-            data.news.forEach(function(item) {
-                const newsItem = document.createElement('div');
-                newsItem.className = 'bg-white rounded-lg p-3 mb-2 border border-gray-100';
+            // Cache the raw items so we can serialize the CHECKED ones on submit.
+            window.__newsCache = data.news.slice(0, 3); // hard cap at 3
+            window.__newsCache.forEach(function(item, idx) {
+                const newsItem = document.createElement('label');
+                newsItem.className = 'flex items-start gap-3 bg-white rounded-lg p-3 mb-2 border border-gray-100 cursor-pointer hover:border-anura-200 transition';
                 newsItem.innerHTML =
-                    '<div class="flex items-start justify-between gap-2">' +
-                        '<h4 class="text-sm font-medium text-gray-800">' + escapeHtml(item.headline) + '</h4>' +
-                        '<span class="text-xs text-gray-400 whitespace-nowrap">' + escapeHtml(item.date || '') + '</span>' +
-                    '</div>' +
-                    '<p class="text-xs text-gray-600 mt-1">' + escapeHtml(item.summary) + '</p>' +
-                    (item.relevance ? '<p class="text-xs text-anura-500 mt-1 italic">' + escapeHtml(item.relevance) + '</p>' : '');
+                    '<input type="checkbox" class="news-checkbox mt-1 accent-anura-500" data-news-idx="' + idx + '" checked>' +
+                    '<div class="flex-1">' +
+                        '<div class="flex items-start justify-between gap-2">' +
+                            '<h4 class="text-sm font-medium text-gray-800">' + escapeHtml(item.headline) + '</h4>' +
+                            '<span class="text-xs text-gray-400 whitespace-nowrap">' + escapeHtml(item.date || '') + '</span>' +
+                        '</div>' +
+                        '<p class="text-xs text-gray-600 mt-1">' + escapeHtml(item.summary) + '</p>' +
+                        (item.relevance ? '<p class="text-xs text-anura-500 mt-1 italic">' + escapeHtml(item.relevance) + '</p>' : '') +
+                    '</div>';
                 container.appendChild(newsItem);
             });
+            // Add a re-sync handler on every checkbox
+            container.querySelectorAll('.news-checkbox').forEach(function(cb) {
+                cb.addEventListener('change', syncSelectedNews);
+            });
+            syncSelectedNews();  // initial sync (all checked)
             resultsDiv.classList.remove('hidden');
         } else {
             errorDiv.classList.remove('hidden');
-            errorDiv.querySelector('div').textContent = 'No recent news found for "' + healthSystemName + '". The guide will still be generated without a news section.';
+            errorDiv.querySelector('div').textContent = 'No recent news found for "' + healthSystemName + '". The guide will generate without a news section.';
         }
     })
     .catch(function(err) {
@@ -471,6 +512,165 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.appendChild(document.createTextNode(text));
     return div.innerHTML;
+}
+
+// Keep the hidden `selected_news_json` field in sync with whatever checkboxes are ticked.
+function syncSelectedNews() {
+    const hidden = document.getElementById('selected_news_json');
+    if (!hidden) return;
+    const cache = window.__newsCache || [];
+    const chosen = [];
+    document.querySelectorAll('.news-checkbox').forEach(function(cb) {
+        if (cb.checked) {
+            const idx = parseInt(cb.dataset.newsIdx, 10);
+            if (cache[idx]) chosen.push(cache[idx]);
+        }
+    });
+    hidden.value = JSON.stringify(chosen);
+}
+
+// ── Multi-interviewer UI ──────────────────────────────
+(function initInterviewers() {
+    const container = document.getElementById('interviewersContainer');
+    const tpl = document.getElementById('interviewerTemplate');
+    const addBtn = document.getElementById('addInterviewerBtn');
+    if (!container || !tpl || !addBtn) return;
+    const MAX_INTERVIEWERS = 5;
+
+    function renumber() {
+        const rows = container.querySelectorAll('.interviewer-row');
+        rows.forEach(function(row, idx) {
+            row.querySelector('.interviewer-label').textContent = 'Interviewer ' + (idx + 1);
+            // Re-key every data-field input with interviewer_*_<idx> names so
+            // the Django view can parse them as an ordered list.
+            row.querySelectorAll('[data-field]').forEach(function(inp) {
+                const field = inp.dataset.field;
+                inp.name = 'interviewer_' + field + '_' + idx;
+                inp.id = 'interviewer_' + field + '_' + idx;
+            });
+            // Show Remove button only for rows beyond the first
+            const rm = row.querySelector('.removeInterviewerBtn');
+            if (rm) rm.classList.toggle('hidden', idx === 0);
+        });
+        addBtn.disabled = rows.length >= MAX_INTERVIEWERS;
+        addBtn.classList.toggle('opacity-40', rows.length >= MAX_INTERVIEWERS);
+        addBtn.classList.toggle('cursor-not-allowed', rows.length >= MAX_INTERVIEWERS);
+    }
+
+    function wireRow(row) {
+        const rm = row.querySelector('.removeInterviewerBtn');
+        if (rm) {
+            rm.addEventListener('click', function() {
+                row.remove();
+                renumber();
+            });
+        }
+        const previewBtn = row.querySelector('.previewNotesBtn');
+        if (previewBtn) {
+            previewBtn.addEventListener('click', function() {
+                previewInterviewerNotes(row, previewBtn);
+            });
+        }
+    }
+
+    function addRow() {
+        const rows = container.querySelectorAll('.interviewer-row');
+        if (rows.length >= MAX_INTERVIEWERS) return;
+        const clone = tpl.content.firstElementChild.cloneNode(true);
+        container.appendChild(clone);
+        wireRow(clone);
+        renumber();
+    }
+
+    addBtn.addEventListener('click', addRow);
+
+    // Prefill first row with any legacy form_data values (if page was re-rendered with an error)
+    addRow();
+    (function prefillFirst() {
+        const first = container.querySelector('.interviewer-row');
+        if (!first) return;
+        const vals = {
+            name: "{{ form_data.interviewer_name|default:''|escapejs }}",
+            title: "{{ form_data.interviewer_title|default:''|escapejs }}",
+            linkedin: "{{ form_data.interviewer_linkedin|default:''|escapejs }}",
+            background: "{{ form_data.interviewer_background|default:''|escapejs }}"
+        };
+        Object.keys(vals).forEach(function(k) {
+            const el = first.querySelector('[data-field="' + k + '"]');
+            if (el && vals[k]) el.value = vals[k];
+        });
+    })();
+})();
+
+function previewInterviewerNotes(row, btn) {
+    const status = row.querySelector('.preview-status');
+    const textarea = row.querySelector('[data-field="custom_notes"]');
+    const getVal = function(field) {
+        const el = row.querySelector('[data-field="' + field + '"]');
+        return el ? (el.value || '').trim() : '';
+    };
+    const name = getVal('name');
+    if (!name) {
+        if (status) {
+            status.classList.remove('hidden');
+            status.classList.add('text-red-500');
+            status.textContent = 'Enter the interviewer name first.';
+        }
+        return;
+    }
+    const healthSystemName = (document.getElementById('health_system_name') || {}).value || '';
+    const jobTitle = (document.getElementById('job_title') || {}).value || '';
+
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Drafting...';
+    if (status) {
+        status.classList.remove('hidden', 'text-red-500');
+        status.classList.add('text-gray-400');
+        status.textContent = 'Asking Claude for a draft — this takes ~10–15 seconds.';
+    }
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch('{% url "fetch_interviewer_notes" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+        body: JSON.stringify({
+            name: name, title: getVal('title'), linkedin: getVal('linkedin'),
+            background: getVal('background'),
+            health_system_name: healthSystemName, job_title: jobTitle,
+        }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = origText;
+        if (!data.ok) {
+            if (status) {
+                status.classList.add('text-red-500');
+                status.classList.remove('text-gray-400');
+                status.textContent = data.error || 'Could not draft notes.';
+            }
+            return;
+        }
+        if (textarea) {
+            textarea.value = data.notes || '';
+        }
+        if (status) {
+            status.classList.remove('text-red-500');
+            status.classList.add('text-gray-400');
+            status.textContent = 'Draft populated — edit as needed. The textarea above is what ships to the PDF.';
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = origText;
+        if (status) {
+            status.classList.remove('text-gray-400');
+            status.classList.add('text-red-500');
+            status.textContent = 'Draft failed — please try again.';
+        }
+        console.error('preview notes error:', err);
+    });
 }
 
 {% if bullhorn_enabled %}

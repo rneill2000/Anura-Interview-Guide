@@ -78,6 +78,72 @@ def index(request):
     })
 
 
+def _parse_interviewers(post) -> list[dict]:
+    """Pull 1..N interviewers from the form.
+
+    Supports the new array-style fields (`interviewer_name_0`, `interviewer_name_1`, ...)
+    used by the multi-interviewer UI, and falls back to the legacy single-interviewer
+    field names (`interviewer_name`, etc.) if the arrayed ones aren't present.
+    Blank rows (no name) are dropped.
+    """
+    interviewers: list[dict] = []
+    # Scan for indexed fields 0..9 — UI caps at 5 but a little slack is cheap.
+    for idx in range(10):
+        name = (post.get(f"interviewer_name_{idx}", "") or "").strip()
+        title = (post.get(f"interviewer_title_{idx}", "") or "").strip()
+        linkedin = (post.get(f"interviewer_linkedin_{idx}", "") or "").strip()
+        background = (post.get(f"interviewer_background_{idx}", "") or "").strip()
+        custom_notes = (post.get(f"interviewer_custom_notes_{idx}", "") or "").strip()
+        if name:
+            interviewers.append({
+                "name": name, "title": title, "linkedin": linkedin,
+                "background": background, "custom_notes": custom_notes,
+            })
+
+    # Fallback: legacy single-interviewer field names
+    if not interviewers:
+        name = (post.get("interviewer_name", "") or "").strip()
+        if name:
+            interviewers.append({
+                "name": name,
+                "title": (post.get("interviewer_title", "") or "").strip(),
+                "linkedin": (post.get("interviewer_linkedin", "") or "").strip(),
+                "background": (post.get("interviewer_background", "") or "").strip(),
+                "custom_notes": (post.get("interviewer_custom_notes", "") or "").strip(),
+            })
+    return interviewers
+
+
+def _parse_selected_news(post) -> list[dict] | None:
+    """Pull the recruiter-approved news items from the form.
+
+    UI posts them as a JSON string in `selected_news_json`. If the field is
+    empty or absent, returns None (meaning: fall back to auto-generating news,
+    or — per new behavior — just skip news). Empty array `[]` is a distinct
+    signal: "recruiter explicitly chose to include NO news — don't regenerate."
+    """
+    import json as _json
+    raw = (post.get("selected_news_json", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = _json.loads(raw)
+        if not isinstance(parsed, list):
+            return None
+        cleaned = []
+        for item in parsed[:3]:  # cap at 3 regardless
+            if isinstance(item, dict) and item.get("headline"):
+                cleaned.append({
+                    "headline": str(item.get("headline", ""))[:200],
+                    "summary": str(item.get("summary", ""))[:800],
+                    "date": str(item.get("date", ""))[:40],
+                    "relevance": str(item.get("relevance", ""))[:400],
+                })
+        return cleaned
+    except (_json.JSONDecodeError, ValueError):
+        return None
+
+
 @require_http_methods(["POST"])
 def generate_guide(request):
     """Accept form data, generate guide, return download link."""
@@ -91,6 +157,8 @@ def generate_guide(request):
         "health_system_website": request.POST.get("health_system_website", "").strip(),
         "health_system_address": request.POST.get("health_system_address", "").strip(),
         "interview_timezone": request.POST.get("interview_timezone", "CT"),
+        # Legacy single-interviewer fields (kept for backward-compat — the
+        # multi-interviewer list lives in `interviewers` below).
         "interviewer_name": request.POST.get("interviewer_name", "").strip(),
         "interviewer_title": request.POST.get("interviewer_title", "").strip(),
         "interviewer_linkedin": request.POST.get("interviewer_linkedin", "").strip(),
@@ -144,11 +212,25 @@ def generate_guide(request):
         f"extracted_chars={len(resume_text)}"
     )
 
+    # Parse multi-interviewer list (falls back to legacy single-interviewer fields)
+    interviewers = _parse_interviewers(request.POST)
+    logger.info(f"interviewers: {len(interviewers)} parsed")
+
+    # Parse recruiter-approved news (None if she didn't preview — skip news in PDF)
+    selected_news = _parse_selected_news(request.POST)
+    logger.info(f"selected_news: {'none' if selected_news is None else f'{len(selected_news)} items'}")
+
     # Generate unique ID for this guide
     guide_id = str(uuid.uuid4())[:8]
 
     # Generate the guide content (AI + templates)
-    guide_content = generate_interview_guide(form_data, fit_text=fit_text, resume_text=resume_text)
+    guide_content = generate_interview_guide(
+        form_data,
+        fit_text=fit_text,
+        resume_text=resume_text,
+        interviewers=interviewers if interviewers else None,
+        selected_news=selected_news,
+    )
 
     # Build the PDF directly into memory and stream it back (avoids Railway's
     # ephemeral filesystem purging the file between generate and download).
@@ -172,7 +254,7 @@ def generate_guide(request):
 
 @require_http_methods(["POST"])
 def fetch_news(request):
-    """AJAX endpoint: fetch recent news for a health system."""
+    """AJAX endpoint: fetch recent news for a health system (6mo filter, max 3)."""
     import json
     try:
         body = json.loads(request.body)
@@ -185,6 +267,41 @@ def fetch_news(request):
 
     news = _generate_recent_news({"health_system_name": health_system_name})
     return JsonResponse({"news": news})
+
+
+@require_http_methods(["POST"])
+def fetch_interviewer_notes(request):
+    """AJAX endpoint: AI-draft notes about a single interviewer so Rachel can
+    preview + edit before sending through to the PDF generator."""
+    import json
+    from guide_generator.generator import _generate_interviewer_insights
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON."}, status=400)
+
+    interviewer = {
+        "name": (body.get("name") or "").strip(),
+        "title": (body.get("title") or "").strip(),
+        "linkedin": (body.get("linkedin") or "").strip(),
+        "background": (body.get("background") or "").strip(),
+    }
+    if not interviewer["name"]:
+        return JsonResponse({"ok": False, "error": "Interviewer name required."})
+
+    # Minimal form context — the generator only needs health_system_name + job_title.
+    form_context = {
+        "health_system_name": (body.get("health_system_name") or "").strip(),
+        "job_title": (body.get("job_title") or "").strip(),
+    }
+
+    try:
+        notes = _generate_interviewer_insights(form_context, interviewer)
+        return JsonResponse({"ok": True, "notes": notes or ""})
+    except Exception:
+        logger.exception("fetch_interviewer_notes failed")
+        return JsonResponse({"ok": False, "error": "Could not draft interviewer notes."}, status=500)
 
 
 # -- Bullhorn API endpoints ------------------------------------------------
