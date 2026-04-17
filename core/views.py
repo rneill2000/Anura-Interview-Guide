@@ -125,6 +125,12 @@ def generate_guide(request):
         request.FILES.get("fit_analysis_file"),
         request.POST.get("fit_analysis_text", ""),
     )
+    uploaded = request.FILES.get("fit_analysis_file")
+    logger.info(
+        f"fit_analysis: uploaded={uploaded.name if uploaded else None}, "
+        f"pasted_chars={len((request.POST.get('fit_analysis_text') or '').strip())}, "
+        f"extracted_chars={len(fit_text)}"
+    )
 
     # Generate unique ID for this guide
     guide_id = str(uuid.uuid4())[:8]

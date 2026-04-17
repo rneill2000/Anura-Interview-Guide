@@ -132,7 +132,16 @@ Job Description:
 {f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}
 {f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}{fit_block}
 
-Generate 5-7 specific talking points this candidate should weave into their interview answers. Each point should:
+Generate 5-7 specific talking points this candidate should weave into their interview answers.
+
+IMPORTANT: If "Recruiter's Candidate Fit Notes" are provided above, those notes are the PRIMARY input. Build talking points that:
+- Surface the specific strengths the recruiter called out (name them concretely, not generically)
+- Proactively frame or address the specific gaps/concerns the recruiter flagged
+- Tie those strengths/gaps back to what this role and health system actually need
+
+If fit notes were not provided, fall back to reasoning from the job description alone.
+
+Each point should:
 - Be directly relevant to the job description and health system
 - Reference specific skills, modules, or experience areas the candidate should highlight
 - Be actionable and concrete (not generic advice)
@@ -242,7 +251,14 @@ Job Description:
 {f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
 {f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}{fit_block}
 
-Generate 6-8 questions the interviewer is likely to ask the candidate based on the job description and role. Include a mix of:
+Generate 6-8 questions the interviewer is likely to ask the candidate.
+
+IMPORTANT: If "Recruiter's Candidate Fit Notes" are provided above, use them to drive the question mix:
+- Include questions that probe the specific gaps/concerns the recruiter flagged (so the candidate can rehearse answers)
+- Include questions that give the candidate a natural chance to surface the specific strengths the recruiter called out
+- Do not duplicate the fit-note text verbatim — turn each gap/strength into a plausible interviewer question
+
+Otherwise base the questions on the job description and role. Include a mix of:
 - Technical/skill-based questions specific to the role
 - Behavioral questions (e.g. "Tell me about a time when...")
 - Situational questions related to healthcare IT
