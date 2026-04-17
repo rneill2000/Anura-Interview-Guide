@@ -564,8 +564,10 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         canvas.line(MARGIN, 38, PAGE_W - MARGIN, 38)
         canvas.restoreState()
 
+    # Accept either a file path (str/Path) or a file-like object (BytesIO).
+    target = output_path if hasattr(output_path, 'write') else str(output_path)
     doc = SimpleDocTemplate(
-        str(output_path),
+        target,
         pagesize=letter,
         rightMargin=MARGIN,
         leftMargin=MARGIN,
