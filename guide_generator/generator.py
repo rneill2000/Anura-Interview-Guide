@@ -424,45 +424,45 @@ def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: s
     fit_text: optional text of the recruiter's candidate fit analysis. If provided,
               a structured "Why You're a Fit" section is generated.
     """
-    # Run all 6 Claude calls concurrently. Each call has a hard 25s budget —
-    # if any single call hangs (usually web search on recent_news), fall back
-    # to its default return so Railway's 30s edge timeout can't kill the whole
-    # response.
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutTimeout
+    # Run all 6 Claude calls concurrently with a SHARED 25s deadline. If the
+    # whole batch doesn't finish in 25s, any unfinished future falls back to
+    # its default return value. This keeps wall-clock under Railway's 30s.
+    from concurrent.futures import ThreadPoolExecutor
     import time as _time
     _t0 = _time.time()
-    _PER_CALL_TIMEOUT = 25  # seconds
-
-    def _safe(future, default, label):
-        try:
-            val = future.result(timeout=_PER_CALL_TIMEOUT)
-            logger.error(f"[{label}] ok in {round(_time.time()-_t0,2)}s")
-            return val
-        except _FutTimeout:
-            logger.error(f"[{label}] TIMED OUT after {_PER_CALL_TIMEOUT}s — using fallback")
-            future.cancel()
-            return default
-        except Exception as e:
-            logger.error(f"[{label}] EXCEPTION {type(e).__name__}: {e} — using fallback")
-            return default
+    _DEADLINE = 25  # total seconds for the whole parallel phase
 
     _ex = ThreadPoolExecutor(max_workers=6)
     try:
-        _f_tp  = _ex.submit(_generate_talking_points,       form_data, fit_text, resume_text)
-        _f_qta = _ex.submit(_generate_questions_to_ask,     form_data)
-        _f_lq  = _ex.submit(_generate_likely_questions,     form_data, fit_text, resume_text)
-        _f_ii  = _ex.submit(_generate_interviewer_insights, form_data)
-        _f_rn  = _ex.submit(_generate_recent_news,          form_data)
-        _f_fa  = _ex.submit(_generate_fit_analysis,         form_data, fit_text)
+        futures = {
+            "talking_points":       (_ex.submit(_generate_talking_points,       form_data, fit_text, resume_text), []),
+            "questions_to_ask":     (_ex.submit(_generate_questions_to_ask,     form_data), []),
+            "likely_questions":     (_ex.submit(_generate_likely_questions,     form_data, fit_text, resume_text), []),
+            "interviewer_insights": (_ex.submit(_generate_interviewer_insights, form_data), ""),
+            "recent_news":          (_ex.submit(_generate_recent_news,          form_data), []),
+            "fit_analysis":         (_ex.submit(_generate_fit_analysis,         form_data, fit_text), {}),
+        }
 
-        talking_points       = _safe(_f_tp,  [], "talking_points")
-        questions_to_ask     = _safe(_f_qta, [], "questions_to_ask")
-        likely_questions     = _safe(_f_lq,  [], "likely_questions")
-        interviewer_insights = _safe(_f_ii, "", "interviewer_insights")
-        recent_news          = _safe(_f_rn,  [], "recent_news")
-        fit_analysis         = _safe(_f_fa,  {}, "fit_analysis")
+        def _remaining():
+            return max(0.1, _DEADLINE - (_time.time() - _t0))
+
+        results = {}
+        for label, (fut, default) in futures.items():
+            try:
+                results[label] = fut.result(timeout=_remaining())
+                logger.error(f"[{label}] ok at t={round(_time.time()-_t0,2)}s")
+            except Exception as e:
+                logger.error(f"[{label}] {type(e).__name__} at t={round(_time.time()-_t0,2)}s — fallback")
+                results[label] = default
+
+        talking_points       = results["talking_points"]
+        questions_to_ask     = results["questions_to_ask"]
+        likely_questions     = results["likely_questions"]
+        interviewer_insights = results["interviewer_insights"]
+        recent_news          = results["recent_news"]
+        fit_analysis         = results["fit_analysis"]
     finally:
-        # Don't wait for any still-running futures — they can't write back anyway.
+        # Fire-and-forget any stragglers — we're past the deadline.
         _ex.shutdown(wait=False, cancel_futures=True)
     logger.error(f"[generate_interview_guide] done in {round(_time.time()-_t0,2)}s")
 
