@@ -74,14 +74,14 @@ DAY_OF_CHECKLIST = [
 def _call_claude_with_search(prompt: str) -> str:
     """Call Anthropic API with web search enabled for real-time news. Falls back to regular call."""
     if not ANTHROPIC_API_KEY:
-        logger.warning("No ANTHROPIC_API_KEY set — skipping AI generation.")
+        logger.error("No ANTHROPIC_API_KEY set — skipping AI generation.")
         return ""
 
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=2000,
             tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
             messages=[{"role": "user", "content": prompt}],
@@ -101,14 +101,14 @@ def _call_claude_with_search(prompt: str) -> str:
 def _call_claude(prompt: str) -> str:
     """Call Anthropic API for AI-generated content. Falls back to empty string on failure."""
     if not ANTHROPIC_API_KEY:
-        logger.warning("No ANTHROPIC_API_KEY set — skipping AI generation.")
+        logger.error("No ANTHROPIC_API_KEY set — skipping AI generation.")
         return ""
 
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -159,7 +159,7 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
                 cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
             return json.loads(cleaned)
         except (json.JSONDecodeError, IndexError):
-            logger.warning("Could not parse AI talking points, using fallback.")
+            logger.error("Could not parse AI talking points, using fallback.")
 
     # Fallback if AI fails
     return [
@@ -200,7 +200,7 @@ Return ONLY a JSON array of strings. No markdown, no explanation."""
                 cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
             return json.loads(cleaned)
         except (json.JSONDecodeError, IndexError):
-            logger.warning("Could not parse AI questions, using fallback.")
+            logger.error("Could not parse AI questions, using fallback.")
 
     return [
         "What does a typical day look like in this role?",
@@ -278,7 +278,7 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
                 cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
             return json.loads(cleaned)
         except (json.JSONDecodeError, IndexError):
-            logger.warning("Could not parse AI likely questions, using fallback.")
+            logger.error("Could not parse AI likely questions, using fallback.")
 
     return [
         f"Tell me about your experience with the technologies mentioned in the {form_data['job_title']} job description. (Tip: Be specific — name the modules, tools, or systems you've worked with.)",
