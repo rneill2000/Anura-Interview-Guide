@@ -424,12 +424,25 @@ def generate_interview_guide(form_data: dict, fit_text: str = "", resume_text: s
     fit_text: optional text of the recruiter's candidate fit analysis. If provided,
               a structured "Why You're a Fit" section is generated.
     """
-    talking_points = _generate_talking_points(form_data, fit_text=fit_text, resume_text=resume_text)
-    questions_to_ask = _generate_questions_to_ask(form_data)
-    likely_questions = _generate_likely_questions(form_data, fit_text=fit_text, resume_text=resume_text)
-    interviewer_insights = _generate_interviewer_insights(form_data)
-    recent_news = _generate_recent_news(form_data)
-    fit_analysis = _generate_fit_analysis(form_data, fit_text)
+    # Run all 6 Claude calls concurrently — they're independent and wall-clock
+    # must stay under Railway's 30s edge proxy timeout.
+    from concurrent.futures import ThreadPoolExecutor
+    import time as _time
+    _t0 = _time.time()
+    with ThreadPoolExecutor(max_workers=6) as _ex:
+        _f_tp   = _ex.submit(_generate_talking_points,   form_data, fit_text, resume_text)
+        _f_qta  = _ex.submit(_generate_questions_to_ask, form_data)
+        _f_lq   = _ex.submit(_generate_likely_questions, form_data, fit_text, resume_text)
+        _f_ii   = _ex.submit(_generate_interviewer_insights, form_data)
+        _f_rn   = _ex.submit(_generate_recent_news,     form_data)
+        _f_fa   = _ex.submit(_generate_fit_analysis,    form_data, fit_text)
+        talking_points       = _f_tp.result()
+        questions_to_ask     = _f_qta.result()
+        likely_questions     = _f_lq.result()
+        interviewer_insights = _f_ii.result()
+        recent_news          = _f_rn.result()
+        fit_analysis         = _f_fa.result()
+    logger.error(f"[generate_interview_guide] 6 parallel Claude calls done in {round(_time.time()-_t0,2)}s")
 
     # Use custom interview tips from form if provided, otherwise defaults
     custom_tips_text = form_data.get("interview_tips", "").strip()
