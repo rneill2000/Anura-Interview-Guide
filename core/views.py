@@ -132,18 +132,24 @@ def generate_guide(request):
     # Generate the guide content (AI + templates)
     guide_content = generate_interview_guide(form_data, fit_text=fit_text)
 
-    # Build the PDF
+    # Build the PDF directly into memory and stream it back (avoids Railway's
+    # ephemeral filesystem purging the file between generate and download).
     safe_name = form_data["candidate_name"].replace(" ", "_")
     filename = f"Interview_Guide_{safe_name}_{guide_id}.pdf"
-    filepath = settings.GUIDES_DIR / filename
-    build_guide_pdf(guide_content, form_data, filepath)
+    buffer = io.BytesIO()
+    build_guide_pdf(guide_content, form_data, buffer)
+    buffer.seek(0)
 
-    return render(request, "success.html", {
-        "filename": filename,
-        "candidate_name": form_data["candidate_name"],
-        "job_title": form_data["job_title"],
-        "health_system_name": form_data["health_system_name"],
-    })
+    response = FileResponse(
+        buffer,
+        as_attachment=True,
+        filename=filename,
+        content_type="application/pdf",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @require_http_methods(["POST"])

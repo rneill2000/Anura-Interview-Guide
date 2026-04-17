@@ -118,8 +118,9 @@ def _call_claude(prompt: str) -> str:
         return ""
 
 
-def _generate_talking_points(form_data: dict) -> list[str]:
+def _generate_talking_points(form_data: dict, fit_text: str = "") -> list[str]:
     """AI-generated talking points tailored to the role and health system."""
+    fit_block = f"\n\nRecruiter's Candidate Fit Notes (use these to pick which strengths to surface and which gaps to frame):\n{fit_text.strip()[:3500]}" if fit_text and fit_text.strip() else ""
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
 
 Role: {form_data['job_title']}
@@ -129,7 +130,7 @@ Job Description:
 
 {f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
 {f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}
-{f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}
+{f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}{fit_block}
 
 Generate 5-7 specific talking points this candidate should weave into their interview answers. Each point should:
 - Be directly relevant to the job description and health system
@@ -228,8 +229,9 @@ Keep it practical and actionable. No fluff. Do NOT invent biographical details â
     return result if result else ""
 
 
-def _generate_likely_questions(form_data: dict) -> list[str]:
+def _generate_likely_questions(form_data: dict, fit_text: str = "") -> list[str]:
     """AI-generated questions the interviewer is likely to ask, so the candidate can prepare."""
+    fit_block = f"\n\nRecruiter's Candidate Fit Notes (anticipate questions that probe the gaps listed here, and questions that give the candidate a chance to surface the strengths listed here):\n{fit_text.strip()[:3500]}" if fit_text and fit_text.strip() else ""
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
 
 Role: {form_data['job_title']}
@@ -238,7 +240,7 @@ Job Description:
 {form_data['job_description']}
 
 {f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
-{f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}
+{f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}{fit_block}
 
 Generate 6-8 questions the interviewer is likely to ask the candidate based on the job description and role. Include a mix of:
 - Technical/skill-based questions specific to the role
@@ -404,9 +406,9 @@ def generate_interview_guide(form_data: dict, fit_text: str = "") -> dict:
     fit_text: optional text of the recruiter's candidate fit analysis. If provided,
               a structured "Why You're a Fit" section is generated.
     """
-    talking_points = _generate_talking_points(form_data)
+    talking_points = _generate_talking_points(form_data, fit_text=fit_text)
     questions_to_ask = _generate_questions_to_ask(form_data)
-    likely_questions = _generate_likely_questions(form_data)
+    likely_questions = _generate_likely_questions(form_data, fit_text=fit_text)
     interviewer_insights = _generate_interviewer_insights(form_data)
     recent_news = _generate_recent_news(form_data)
     fit_analysis = _generate_fit_analysis(form_data, fit_text)

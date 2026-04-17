@@ -207,6 +207,24 @@ def _draw_cover(canvas, doc, form_data):
             date_str += f" {tz}"
         canvas.drawString(72, y, date_str)
 
+    # Location / meeting link (Zoom/Teams URL for video, address for in-person, number for phone)
+    loc = (form_data.get('interview_location') or '').strip()
+    fmt = (form_data.get('interview_format') or '').lower()
+    if loc:
+        y -= 18
+        canvas.setFillColor(LIGHT_BLUE_2)
+        canvas.setFont("Helvetica", 10)
+        if loc.lower().startswith(('http://', 'https://')):
+            label = "Meeting link: "
+        elif 'phone' in fmt:
+            label = "Dial-in: "
+        elif 'person' in fmt or 'onsite' in fmt:
+            label = "Location: "
+        else:
+            label = "Where: "
+        display_loc = loc if len(loc) <= 90 else loc[:87] + '\u2026'
+        canvas.drawString(72, y, f"{label}{display_loc}")
+
     canvas.restoreState()
 
 
@@ -660,6 +678,17 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                 styles['interviewer_role'],
             ))
         _section_divider(story, "Your Interviewer", styles, icon_key="interviewer", keep_with_next=interviewer_first)
+        if form_data.get('interviewer_background'):
+            bg_label_style = ParagraphStyle(
+                'InterviewerBgLabel', fontName='Helvetica-Bold', fontSize=10,
+                textColor=NAVY, spaceBefore=6, spaceAfter=4,
+            )
+            story.append(Paragraph("Recruiter notes about this interviewer:", bg_label_style))
+            for para in form_data['interviewer_background'].strip().split('\n\n'):
+                para = para.strip()
+                if para:
+                    story.append(Paragraph(para, styles['body']))
+            story.append(Spacer(1, 6))
         if guide_content.get('interviewer_insights'):
             for para in guide_content['interviewer_insights'].strip().split('\n\n'):
                 para = para.strip()
