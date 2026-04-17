@@ -30,7 +30,7 @@ DEFAULT_INTERVIEW_TIPS = [
     "Sign into the meeting or arrive at the location a few minutes early.",
     "Keep a glass of water and a notepad nearby.",
     "Silence your phone completely before the interview starts.",
-    "Prepare 2–3 specific examples of your work using the STAR method (Situation, Task, Action, Result).",
+    "Prepare 2–3 specific examples of your work that demonstrate relevant experience and measurable results.",
     "Research the organization beforehand — review their website, recent news, and mission statement.",
     "Make eye contact, smile, and address the interviewer by name.",
     "Be honest about what you don't know, but frame it positively and show willingness to learn.",
@@ -38,11 +38,11 @@ DEFAULT_INTERVIEW_TIPS = [
 
 GENERAL_TIPS = [
     "Research the organization thoroughly before the interview — review their website, recent news, mission statement, and any publicly available strategic plans.",
-    "Sign into the meeting 5–10 minutes early. Test your audio, video, and internet connection 30 minutes beforehand, and have a backup plan (phone dial-in number) ready in case something fails.",
-    "Dress professionally from the waist up — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
-    "Have your resume and a list of references pulled up on your screen or printed nearby so you can reference them if asked. Keep a notepad and pen handy for notes.",
-    "Prepare 2–3 concise stories using the STAR method (Situation, Task, Action, Result) that demonstrate your relevant experience.",
-    "Look into the camera (not the screen) when speaking, smile, and address each interviewer by name.",
+    "Arrive 10–15 minutes early. If virtual, test your audio/video setup 30 minutes beforehand and have a backup plan (phone dial-in number) ready.",
+    "Dress professionally — business formal unless told otherwise. When in doubt, overdress rather than underdress.",
+    "Bring multiple copies of your resume, a notepad, and a pen. Have a list of your references ready in case they ask.",
+    "Prepare 2–3 concise stories that demonstrate your relevant experience, focusing on the situation, your actions, and the measurable results you achieved.",
+    "Make eye contact, offer a firm handshake, and address each interviewer by name.",
     "Listen carefully to each question. It's perfectly fine to pause briefly before answering — it shows thoughtfulness.",
     "Be honest about what you don't know, but frame it positively: 'I haven't worked with that specific module, but I've done X, which is similar, and I'm a fast learner.'",
     "Show enthusiasm for the role and the organization. Interviewers want to see genuine interest, not just qualifications.",
@@ -50,18 +50,17 @@ GENERAL_TIPS = [
 ]
 
 FOLLOW_UP_TIPS = [
-    "Send a personalized thank-you email within 24 hours of the interview to each person you met with.",
+    "Write a personalized thank-you note within 24 hours of the interview and send it to your Anura Connect recruiter — we'll pass it along to the hiring manager on your behalf.",
     "Reference something specific from your conversation to make it memorable.",
     "Reiterate your interest in the role and briefly mention why you'd be a great fit.",
-    "If you discussed any follow-up items (articles, references, portfolio samples), include them in your email.",
+    "If you discussed any follow-up items (articles, references, portfolio samples), include them in your note.",
     "Contact your recruiter at Anura Connect after the interview to share how it went — this helps us advocate for you.",
 ]
 
 DAY_OF_CHECKLIST = [
-    "Confirm the interview time and the meeting link or dial-in details. Most interviews are conducted remotely via video.",
-    "Test your internet, camera, and microphone. Close unnecessary browser tabs and apps before the meeting starts.",
-    "Choose a quiet, well-lit space with a clean background. Natural light facing you works best.",
-    "If the interview is in-person (rare): look up the address, parking situation, and building entrance ahead of time.",
+    "Confirm the interview time, location, and format (in-person, phone, or video).",
+    "If in-person: look up the address, parking situation, and building entrance ahead of time.",
+    "If virtual: test your internet, camera, and microphone. Close unnecessary browser tabs and apps.",
     "Have a glass of water nearby.",
     "Silence your phone completely.",
     "Keep your interview guide and notes within easy reach (but don't read from them verbatim).",
@@ -70,6 +69,33 @@ DAY_OF_CHECKLIST = [
 
 
 # ─── AI-GENERATED CONTENT ───────────────────────────────────────────────
+
+def _call_claude_with_search(prompt: str) -> str:
+    """Call Anthropic API with web search enabled for real-time news. Falls back to regular call."""
+    if not ANTHROPIC_API_KEY:
+        logger.warning("No ANTHROPIC_API_KEY set — skipping AI generation.")
+        return ""
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        # Extract text from response (may include tool use blocks)
+        text_parts = []
+        for block in message.content:
+            if hasattr(block, 'text'):
+                text_parts.append(block.text)
+        return "\n".join(text_parts) if text_parts else ""
+    except Exception as e:
+        logger.error(f"Claude API call with search failed: {e}")
+        # Fall back to regular call without search
+        return _call_claude(prompt)
+
 
 def _call_claude(prompt: str) -> str:
     """Call Anthropic API for AI-generated content. Falls back to empty string on failure."""
@@ -201,84 +227,6 @@ Keep it practical and actionable. No fluff. Do NOT invent biographical details �
     return result if result else ""
 
 
-def _generate_fit_analysis(form_data: dict, fit_text: str) -> dict:
-    """
-    AI-structured candidate-fit analysis based on an uploaded/pasted fit document.
-
-    Returns a dict with four keys:
-      - matched_strengths:       list of {"point": str, "evidence": str}
-      - gaps_to_address:         list of {"gap": str, "framing": str}
-      - suggested_talking_points: list[str]
-      - story_prompts:           list of {"prompt": str, "situation": str}
-
-    If no fit_text is provided, returns an empty dict (caller should skip the section).
-    """
-    if not fit_text or not fit_text.strip():
-        return {}
-
-    # Keep the prompt payload bounded — fit docs are typically 1–3 pages of text.
-    fit_excerpt = fit_text.strip()
-    if len(fit_excerpt) > 12000:
-        fit_excerpt = fit_excerpt[:12000] + "\n\n[...truncated for length...]"
-
-    prompt = f"""You are helping a healthcare IT consultant prepare for an interview.
-
-A recruiter has already prepared a "candidate fit analysis" — notes on how this candidate's background aligns with the role. Your job is to restructure and sharpen that analysis into a section the candidate will read before the interview.
-
-Role: {form_data['job_title']}
-Health System: {form_data['health_system_name']}
-
-Job Description:
-{form_data['job_description']}
-
-Recruiter's Fit Analysis (source material):
-\"\"\"
-{fit_excerpt}
-\"\"\"
-
-Produce a JSON object with exactly these four keys:
-
-1. "matched_strengths": an array of 4–6 objects, each with:
-   - "point":    a short (≤10 word) headline naming the strength (e.g., "Epic Ambulatory go-live leadership")
-   - "evidence": a 1–2 sentence specific example from their background that proves it, phrased in second person ("You led the go-live at...")
-
-2. "gaps_to_address": an array of 2–4 objects, each with:
-   - "gap":     a short (≤10 word) headline naming an area where the candidate is lighter than the JD asks for
-   - "framing": 1–2 sentences of coaching on how to honestly frame it — what adjacent experience to pivot to, what learning posture to show. Never recommend bluffing.
-
-3. "suggested_talking_points": an array of 4–6 ready-to-say sentences the candidate can weave into answers. Each should connect a specific piece of their background to a specific requirement from the JD. Write them as the candidate would say them, in first person.
-
-4. "story_prompts": an array of 3–5 objects, each with:
-   - "prompt":    a likely interview question this candidate is well-positioned to answer (e.g., "Tell me about a time you led a go-live under pressure.")
-   - "situation": 1–2 sentences pointing to the specific situation from their background they should use, written in second person ("Use the {{project}} go-live where...")
-
-Rules:
-- Only use facts present in the recruiter's fit analysis or derivable from the job description. Do NOT invent experience.
-- Be specific. Prefer concrete projects, systems, modules, and outcomes over generic adjectives.
-- Keep each text field under ~250 characters.
-- Return ONLY the JSON object. No markdown fences, no preamble."""
-
-    result = _call_claude(prompt)
-    if not result:
-        return {}
-
-    try:
-        cleaned = result.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        parsed = json.loads(cleaned)
-        # Normalize — ensure every key exists with a safe default
-        return {
-            "matched_strengths": parsed.get("matched_strengths", []) or [],
-            "gaps_to_address": parsed.get("gaps_to_address", []) or [],
-            "suggested_talking_points": parsed.get("suggested_talking_points", []) or [],
-            "story_prompts": parsed.get("story_prompts", []) or [],
-        }
-    except (json.JSONDecodeError, IndexError, KeyError, AttributeError) as e:
-        logger.warning(f"Could not parse AI fit analysis: {e}")
-        return {}
-
-
 def _generate_likely_questions(form_data: dict) -> list[str]:
     """AI-generated questions the interviewer is likely to ask, so the candidate can prepare."""
     prompt = f"""You are helping a healthcare IT consultant prepare for a job interview.
@@ -296,7 +244,7 @@ Generate 6-8 questions the interviewer is likely to ask the candidate based on t
 - Behavioral questions (e.g. "Tell me about a time when...")
 - Situational questions related to healthcare IT
 
-For each question, add a brief one-sentence tip in parentheses on how to approach the answer.
+For each question, add a brief one-sentence tip in parentheses on how to approach the answer. Do NOT reference the STAR method or any specific interview framework. Instead give practical, specific advice for that question.
 
 Return ONLY a JSON array of strings. No markdown, no explanation. Example:
 ["Question here? (Tip: Focus on specific outcomes and metrics.)"]"""
@@ -313,7 +261,7 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
 
     return [
         f"Tell me about your experience with the technologies mentioned in the {form_data['job_title']} job description. (Tip: Be specific — name the modules, tools, or systems you've worked with.)",
-        "Describe a challenging go-live or system implementation you supported. What was your role and how did you handle obstacles? (Tip: Use the STAR method — Situation, Task, Action, Result.)",
+        "Describe a challenging go-live or system implementation you supported. What was your role and how did you handle obstacles? (Tip: Walk through the situation, your specific actions, and the measurable outcome.)",
         "How do you prioritize tasks when you have multiple urgent requests from different departments? (Tip: Give a real example showing your decision-making process.)",
         f"Why are you interested in working at {form_data['health_system_name']}? (Tip: Reference something specific about the organization — their mission, recent initiatives, or growth.)",
         "How do you handle pushback from clinical end-users during a system change or workflow update? (Tip: Show empathy for the user's perspective while explaining how you drive adoption.)",
@@ -321,21 +269,64 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
     ]
 
 
+def _generate_recent_news(form_data: dict) -> list[dict]:
+    """AI-generated recent news about the health system using web search."""
+    prompt = f"""Search for recent news about {form_data['health_system_name']} health system.
+
+Focus on:
+- Recent organizational changes, expansions, or mergers
+- Technology implementations (especially Epic/EHR-related)
+- Awards, recognitions, or rankings
+- New facilities, services, or partnerships
+- Leadership changes
+- Financial news or strategic initiatives
+
+Return ONLY a JSON array of 3-5 news items. Each item should have:
+- "headline": A concise headline (under 100 characters)
+- "summary": A 1-2 sentence summary of the news
+- "date": Approximate date (e.g. "March 2025" or "Q1 2025") or "Recent" if unknown
+- "relevance": One sentence on why this matters for someone interviewing there
+
+Example format:
+[{{"headline": "Example Health Expands Epic Implementation", "summary": "Example Health announced...", "date": "February 2025", "relevance": "Shows the organization is investing in Epic, relevant for IT roles."}}]
+
+Return ONLY the JSON array. No markdown, no explanation."""
+
+    result = _call_claude_with_search(prompt)
+    if result:
+        try:
+            cleaned = result.strip()
+            # Try to extract JSON from the response
+            if "```" in cleaned:
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+                cleaned = cleaned.strip()
+            # Find the JSON array in the response
+            start = cleaned.find("[")
+            end = cleaned.rfind("]") + 1
+            if start >= 0 and end > start:
+                cleaned = cleaned[start:end]
+            return json.loads(cleaned)
+        except (json.JSONDecodeError, IndexError):
+            logger.warning("Could not parse AI news results, using fallback.")
+
+    # Fallback — return empty list (no news available)
+    return []
+
+
 # ─── MAIN GENERATOR ─────────────────────────────────────────────────────
 
-def generate_interview_guide(form_data: dict, fit_text: str = "") -> dict:
+def generate_interview_guide(form_data: dict) -> dict:
     """
     Generate the full interview guide content.
     Returns a dict with all sections ready for PDF rendering.
-
-    fit_text: optional text of the recruiter's candidate fit analysis. If provided,
-              a structured "Why You're a Fit" section is generated.
     """
     talking_points = _generate_talking_points(form_data)
     questions_to_ask = _generate_questions_to_ask(form_data)
     likely_questions = _generate_likely_questions(form_data)
     interviewer_insights = _generate_interviewer_insights(form_data)
-    fit_analysis = _generate_fit_analysis(form_data, fit_text)
+    recent_news = _generate_recent_news(form_data)
 
     # Use custom interview tips from form if provided, otherwise defaults
     custom_tips_text = form_data.get("interview_tips", "").strip()
@@ -347,12 +338,32 @@ def generate_interview_guide(form_data: dict, fit_text: str = "") -> dict:
     else:
         interview_tips = list(DEFAULT_INTERVIEW_TIPS)
 
+    # Use custom best practices from form if provided, otherwise defaults
+    custom_practices_text = form_data.get("best_practices", "").strip()
+    if custom_practices_text:
+        general_tips = [
+            line.strip() for line in custom_practices_text.splitlines()
+            if line.strip()
+        ]
+    else:
+        general_tips = list(GENERAL_TIPS)
+
+    # Use custom follow-up tips from form if provided, otherwise defaults
+    custom_followup_text = form_data.get("follow_up_tips", "").strip()
+    if custom_followup_text:
+        follow_up_tips = [
+            line.strip() for line in custom_followup_text.splitlines()
+            if line.strip()
+        ]
+    else:
+        follow_up_tips = list(FOLLOW_UP_TIPS)
+
     return {
         "talking_points": talking_points,
         "questions_to_ask": questions_to_ask,
         "likely_questions": likely_questions,
         "interviewer_insights": interviewer_insights,
-        "fit_analysis": fit_analysis,
+        "recent_news": recent_news,
         "general_tips": GENERAL_TIPS,
         "interview_tips": interview_tips,
         "follow_up_tips": FOLLOW_UP_TIPS,
