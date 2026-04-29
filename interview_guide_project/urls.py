@@ -6,6 +6,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.index, name='index'),
     path('generate/', views.generate_guide, name='generate_guide'),
+    path('finalize/', views.finalize_guide, name='finalize_guide'),
     path('download/<str:filename>/', views.download_guide, name='download_guide'),
     path('fetch-news/', views.fetch_news, name='fetch_news'),
     path('fetch-interviewer-notes/', views.fetch_interviewer_notes, name='fetch_interviewer_notes'),

@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Review & Edit Guide{% endblock %}
+
+{% block extra_head %}
+<style>
+    .edit-section { transition: box-shadow 0.2s; }
+    .edit-section:focus-within { box-shadow: 0 0 0 2px rgba(26, 107, 138, 0.15); }
+    .item-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+    .item-row textarea { flex: 1; min-height: 3.5rem; }
+    .remove-item { flex-shrink: 0; margin-top: 6px; color: #ef4444; cursor: pointer; font-size: 18px; line-height: 1; background: none; border: none; padding: 4px; }
+    .remove-item:hover { color: #dc2626; }
+    .add-item-btn { font-size: 13px; color: #1a6b8a; font-weight: 500; cursor: pointer; background: none; border: 1px dashed #92c9db; border-radius: 6px; padding: 6px 12px; width: 100%; text-align: center; }
+    .add-item-btn:hover { background: #e8f4f8; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="text-center mb-8">
+    <h1 class="text-2xl font-bold text-anura-950 tracking-tight mb-2">Review Your Interview Guide</h1>
+    <p class="text-gray-500 text-sm max-w-xl mx-auto">Edit any section below, then download the final PDF. All AI-generated content is fully editable.</p>
+</div>
+
+<form method="post" action="{% url 'finalize_guide' %}" id="previewForm">
+    {% csrf_token %}
+
+    <!-- Pass through the original form data as hidden fields -->
+    <input type="hidden" name="candidate_name" value="{{ form_data.candidate_name }}">
+    <input type="hidden" name="job_title" value="{{ form_data.job_title }}">
+    <input type="hidden" name="job_description" value="{{ form_data.job_description }}">
+    <input type="hidden" name="health_system_name" value="{{ form_data.health_system_name }}">
+    <input type="hidden" name="health_system_info" value="{{ form_data.health_system_info }}">
+    <input type="hidden" name="health_system_website" value="{{ form_data.health_system_website }}">
+    <input type="hidden" name="health_system_address" value="{{ form_data.health_system_address }}">
+    <input type="hidden" name="interview_date" value="{{ form_data.interview_date }}">
+    <input type="hidden" name="interview_time" value="{{ form_data.interview_time }}">
+    <input type="hidden" name="interview_timezone" value="{{ form_data.interview_timezone }}">
+    <input type="hidden" name="interview_format" value="{{ form_data.interview_format }}">
+    <input type="hidden" name="interview_location" value="{{ form_data.interview_location }}">
+    <input type="hidden" name="contact_name" value="{{ form_data.contact_name }}">
+    <input type="hidden" name="contact_email" value="{{ form_data.contact_email }}">
+    <input type="hidden" name="contact_phone" value="{{ form_data.contact_phone }}">
+    <input type="hidden" name="interview_tips" value="{{ form_data.interview_tips }}">
+    <input type="hidden" name="best_practices" value="{{ form_data.best_practices }}">
+    <input type="hidden" name="follow_up_tips" value="{{ form_data.follow_up_tips }}">
+    <input type="hidden" name="selected_news_json" value="{{ selected_news_json }}">
+    <input type="hidden" name="interviewers_json" value="{{ interviewers_json }}">
+    <input type="hidden" name="fit_analysis_json" value="{{ fit_analysis_json }}">
+
+    <!-- Guide header info -->
+    <div class="bg-anura-50 border border-anura-100 rounded-xl p-4 mb-6">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+                <p class="text-sm font-semibold text-anura-900">{{ form_data.candidate_name }}</p>
+                <p class="text-xs text-anura-600">{{ form_data.job_title }} at {{ form_data.health_system_name }}</p>
+            </div>
+            {% if form_data.interview_date %}
+            <p class="text-xs text-anura-500">{{ form_data.interview_date }}{% if form_data.interview_time %} · {{ form_data.interview_time }}{% endif %}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Key Talking Points -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm edit-section">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-1">Key Talking Points</h2>
+        <p class="text-xs text-gray-400 mb-4">These are woven into the candidate's prep. Edit, reorder, add, or remove.</p>
+        <div id="talkingPointsList">
+            {% for point in talking_points %}
+            <div class="item-row">
+                <textarea name="talking_point" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ point }}</textarea>
+                <button type="button" class="remove-item" onclick="this.closest('.item-row').remove()" title="Remove">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="add-item-btn" onclick="addItem('talkingPointsList', 'talking_point')">+ Add talking point</button>
+    </div>
+
+    <!-- Questions to Ask -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm edit-section">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-1">Questions to Ask the Interviewer</h2>
+        <p class="text-xs text-gray-400 mb-4">Smart questions the candidate should ask. Edit or remove any that don't fit.</p>
+        <div id="questionsToAskList">
+            {% for q in questions_to_ask %}
+            <div class="item-row">
+                <textarea name="question_to_ask" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ q }}</textarea>
+                <button type="button" class="remove-item" onclick="this.closest('.item-row').remove()" title="Remove">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="add-item-btn" onclick="addItem('questionsToAskList', 'question_to_ask')">+ Add question</button>
+    </div>
+
+    <!-- Prepare For These Questions -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm edit-section">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-1">Prepare For These Questions</h2>
+        <p class="text-xs text-gray-400 mb-4">Questions the interviewer is likely to ask, with tips. Edit freely.</p>
+        <div id="likelyQuestionsList">
+            {% for q in likely_questions %}
+            <div class="item-row">
+                <textarea name="likely_question" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ q }}</textarea>
+                <button type="button" class="remove-item" onclick="this.closest('.item-row').remove()" title="Remove">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="add-item-btn" onclick="addItem('likelyQuestionsList', 'likely_question')">+ Add question</button>
+    </div>
+
+    <!-- Interviewer Insights -->
+    {% if interviewers %}
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm edit-section">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Interviewer Insights</h2>
+        {% for iv in interviewers %}
+        <div class="mb-4 {% if not forloop.last %}pb-4 border-b border-gray-100{% endif %}">
+            <p class="text-sm font-medium text-anura-800 mb-1">{{ iv.name }}{% if iv.title %} — {{ iv.title }}{% endif %}</p>
+            <textarea name="interviewer_insights_{{ forloop.counter0 }}" rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ iv.insights }}</textarea>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Recent News -->
+    {% if recent_news %}
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm edit-section">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-1">Recent News</h2>
+        <p class="text-xs text-gray-400 mb-4">News items included in the guide. Edit or remove.</p>
+        <div id="newsList">
+            {% for item in recent_news %}
+            <div class="news-edit-row border border-gray-100 rounded-lg p-3 mb-3 bg-gray-50">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <input type="text" name="news_headline_{{ forloop.counter0 }}" value="{{ item.headline }}" placeholder="Headline"
+                           class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm font-medium focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none">
+                    <input type="text" name="news_date_{{ forloop.counter0 }}" value="{{ item.date }}" placeholder="Date" style="width: 120px;"
+                           class="px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none">
+                    <button type="button" class="remove-item" onclick="this.closest('.news-edit-row').remove()" title="Remove">&times;</button>
+                </div>
+                <textarea name="news_summary_{{ forloop.counter0 }}" rows="2" placeholder="Summary"
+                          class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mb-2 focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none resize-y">{{ item.summary }}</textarea>
+                <input type="text" name="news_relevance_{{ forloop.counter0 }}" value="{{ item.relevance }}" placeholder="Why it matters for the interview"
+                       class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-anura-600 focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Fit Analysis (if present) -->
+    {% if fit_analysis.matched_strengths or fit_analysis.gaps_to_address or fit_analysis.suggested_talking_points or fit_analysis.story_prompts %}
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm edit-section">
+        <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Why You're a Fit</h2>
+
+        {% if fit_analysis.matched_strengths %}
+        <div class="mb-5">
+            <p class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-2">Matched Strengths</p>
+            {% for item in fit_analysis.matched_strengths %}
+            <div class="item-row">
+                <div class="flex-1 space-y-1">
+                    <input type="text" name="fit_strength_point_{{ forloop.counter0 }}" value="{{ item.point }}" placeholder="Strength headline"
+                           class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-medium focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none">
+                    <textarea name="fit_strength_evidence_{{ forloop.counter0 }}" rows="2" placeholder="Evidence"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none resize-y">{{ item.evidence }}</textarea>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if fit_analysis.gaps_to_address %}
+        <div class="mb-5">
+            <p class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-2">Gaps to Address</p>
+            {% for item in fit_analysis.gaps_to_address %}
+            <div class="item-row">
+                <div class="flex-1 space-y-1">
+                    <input type="text" name="fit_gap_gap_{{ forloop.counter0 }}" value="{{ item.gap }}" placeholder="Gap headline"
+                           class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-medium focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none">
+                    <textarea name="fit_gap_framing_{{ forloop.counter0 }}" rows="2" placeholder="How to frame it"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none resize-y">{{ item.framing }}</textarea>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if fit_analysis.suggested_talking_points %}
+        <div class="mb-5">
+            <p class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-2">Fit-Specific Talking Points</p>
+            <div id="fitTalkingPointsList">
+                {% for point in fit_analysis.suggested_talking_points %}
+                <div class="item-row">
+                    <textarea name="fit_talking_point" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y">{{ point }}</textarea>
+                    <button type="button" class="remove-item" onclick="this.closest('.item-row').remove()" title="Remove">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if fit_analysis.story_prompts %}
+        <div>
+            <p class="text-xs font-semibold text-anura-600 uppercase tracking-wide mb-2">Story Prompts</p>
+            {% for item in fit_analysis.story_prompts %}
+            <div class="item-row">
+                <div class="flex-1 space-y-1">
+                    <input type="text" name="fit_story_prompt_{{ forloop.counter0 }}" value="{{ item.prompt }}" placeholder="Likely question"
+                           class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-medium focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none">
+                    <textarea name="fit_story_situation_{{ forloop.counter0 }}" rows="2" placeholder="Situation to reference"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none resize-y">{{ item.situation }}</textarea>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Action buttons -->
+    <div class="flex items-center justify-between pt-2 pb-8">
+        <a href="/" class="text-sm text-gray-500 hover:text-gray-700 transition">← Back to form</a>
+        <button type="submit" id="downloadBtn"
+                class="inline-flex items-center justify-center px-8 py-3 bg-anura-500 hover:bg-anura-600 text-white font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-anura-100 focus:ring-offset-2">
+            <span class="btn-text">Download PDF</span>
+            <span class="btn-loading hidden">
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Building PDF...
+            </span>
+        </button>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function addItem(listId, fieldName) {
+    const list = document.getElementById(listId);
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML =
+        '<textarea name="' + fieldName + '" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition resize-y" placeholder="Type here..."></textarea>' +
+        '<button type="button" class="remove-item" onclick="this.closest(\'.item-row\').remove()" title="Remove">&times;</button>';
+    list.appendChild(row);
+    row.querySelector('textarea').focus();
+}
+
+// Submit via fetch to download PDF without leaving the page
+document.getElementById('previewForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const btn = document.getElementById('downloadBtn');
+    btn.querySelector('.btn-text').classList.add('hidden');
+    btn.querySelector('.btn-loading').classList.remove('hidden');
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-wait');
+
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+    })
+    .then(function(response) {
+        if (!response.ok) throw new Error('Server returned ' + response.status);
+        const disposition = response.headers.get('Content-Disposition') || '';
+        let filename = 'Interview_Guide.pdf';
+        const match = disposition.match(/filename="?([^";\n]+)"?/);
+        if (match) filename = match[1];
+        return response.blob().then(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            // Clear the auto-save from the input form
+            try { localStorage.removeItem('interviewGuideFormData'); } catch(ex) {}
+        });
+    })
+    .catch(function(err) {
+        console.error('PDF build failed:', err);
+        alert('PDF generation failed — please try again.');
+    })
+    .finally(function() {
+        btn.querySelector('.btn-text').classList.remove('hidden');
+        btn.querySelector('.btn-loading').classList.add('hidden');
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-wait');
+    });
+});
+</script>
+{% endblock %}

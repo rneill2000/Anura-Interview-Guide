@@ -136,7 +136,7 @@ Job Description:
 {f"Interviewer Background: {form_data['interviewer_background']}" if form_data.get('interviewer_background') else ""}
 {f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}{fit_block}{resume_block}
 
-Generate 5-7 specific talking points this candidate should weave into their interview answers.
+Generate 3-5 specific talking points this candidate should weave into their interview answers.
 
 IMPORTANT: Use these inputs in priority order when shaping talking points:
 1. "Recruiter's Candidate Fit Notes" (if provided) — PRIMARY signal. Surface the specific strengths the recruiter called out, proactively frame the gaps/concerns the recruiter flagged, and tie each back to what this role and health system actually need. Name things concretely, not generically.
@@ -170,7 +170,6 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
         f"Demonstrate your understanding of {form_data['health_system_name']}'s environment and how your skills align with their needs.",
         "Share examples of successful go-lives, optimizations, or implementations you've led.",
         "Emphasize your ability to work collaboratively with clinical end-users and translate technical concepts for non-technical stakeholders.",
-        "Discuss your approach to troubleshooting and problem-solving under pressure during critical system events.",
     ]
 
 
@@ -240,12 +239,9 @@ Background notes: {interviewer.get('background') or 'Not provided'}
 Health System: {form_data['health_system_name']}
 Role being interviewed for: {form_data['job_title']}
 
-Write a brief 2-3 paragraph summary that helps the candidate understand:
-1. What this interviewer likely cares about based on their role/title
-2. How to connect with them (common ground, topics to emphasize)
-3. What kind of questions they're likely to ask given their position
+Write a concise 2-3 sentence summary covering: what this person likely cares about given their role, and one tip for connecting with them in the interview.
 
-Keep it practical and actionable. No fluff. Do NOT invent biographical details — only work with what's provided. If little info is given, focus on what their title tells us about their perspective."""
+Keep it tight and actionable. No fluff. Do NOT invent biographical details — only work with what's provided. If little info is given, focus on what their title tells us about their perspective."""
 
     result = _call_claude(prompt)
     return result if result else ""
@@ -524,7 +520,7 @@ def generate_interview_guide(
                 logger.error(f"[{label}] {type(e).__name__} at t={round(_time.time()-_t0,2)}s — fallback")
                 results[label] = default
 
-        talking_points   = results["talking_points"][:7]
+        talking_points   = results["talking_points"][:5]
         questions_to_ask = results["questions_to_ask"][:5]
         likely_questions = results["likely_questions"][:5]
         fit_analysis     = results["fit_analysis"]

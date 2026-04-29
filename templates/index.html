@@ -463,83 +463,13 @@ function clearAutoSave() {
     try { localStorage.removeItem(AUTOSAVE_KEY); } catch(e) {}
 }
 
-// ── Submit via fetch (keeps page alive during generation) ────
-document.getElementById('guideForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const form = this;
+// ── Submit form (navigates to preview page) ────
+document.getElementById('guideForm').addEventListener('submit', function() {
     const btn = document.getElementById('submitBtn');
     btn.querySelector('.btn-text').classList.add('hidden');
     btn.querySelector('.btn-loading').classList.remove('hidden');
     btn.disabled = true;
     btn.classList.add('opacity-70', 'cursor-wait');
-
-    const formData = new FormData(form);
-
-    fetch(form.action, {
-        method: 'POST',
-        body: formData,
-    })
-    .then(function(response) {
-        if (!response.ok) {
-            throw new Error('Server returned ' + response.status);
-        }
-        const contentType = response.headers.get('Content-Type') || '';
-        if (contentType.includes('application/pdf')) {
-            // Success — download the PDF
-            const disposition = response.headers.get('Content-Disposition') || '';
-            let filename = 'Interview_Guide.pdf';
-            const match = disposition.match(/filename="?([^";\n]+)"?/);
-            if (match) filename = match[1];
-            return response.blob().then(function(blob) {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                clearAutoSave();
-            });
-        } else {
-            // Server returned HTML (probably a validation error) — don't navigate
-            return response.text().then(function(html) {
-                // Extract error message if possible
-                const tmp = document.createElement('div');
-                tmp.innerHTML = html;
-                const errorDiv = tmp.querySelector('.bg-red-50');
-                if (errorDiv) {
-                    // Show the error without leaving the page
-                    let existingError = document.querySelector('.bg-red-50.border-red-200');
-                    if (!existingError) {
-                        existingError = document.createElement('div');
-                        existingError.className = 'bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm';
-                        form.parentNode.insertBefore(existingError, form);
-                    }
-                    existingError.textContent = errorDiv.textContent.trim();
-                }
-            });
-        }
-    })
-    .catch(function(err) {
-        console.error('Generation failed:', err);
-        // Show a friendly error without losing the form data
-        let existingError = document.querySelector('.bg-red-50.border-red-200');
-        if (!existingError) {
-            existingError = document.createElement('div');
-            existingError.className = 'bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm';
-            form.parentNode.insertBefore(existingError, form);
-        }
-        existingError.textContent = 'Generation timed out or failed. Your data is saved — please try again. If this keeps happening, try generating without news (uncheck all news items or skip the fetch).';
-        // Scroll to the error
-        existingError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    })
-    .finally(function() {
-        btn.querySelector('.btn-text').classList.remove('hidden');
-        btn.querySelector('.btn-loading').classList.add('hidden');
-        btn.disabled = false;
-        btn.classList.remove('opacity-70', 'cursor-wait');
-    });
 });
 
 function fetchRecentNews() {

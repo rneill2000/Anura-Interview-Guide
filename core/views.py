@@ -255,9 +255,6 @@ def generate_guide(request):
     selected_news = _parse_selected_news(request.POST)
     logger.info(f"selected_news: {'none' if selected_news is None else f'{len(selected_news)} items'}")
 
-    # Generate unique ID for this guide
-    guide_id = str(uuid.uuid4())[:8]
-
     # Generate the guide content (AI + templates)
     guide_content = generate_interview_guide(
         form_data,
@@ -267,8 +264,156 @@ def generate_guide(request):
         selected_news=selected_news,
     )
 
-    # Build the PDF directly into memory and stream it back (avoids Railway's
-    # ephemeral filesystem purging the file between generate and download).
+    # Serialize complex objects as JSON so the preview form can pass them back
+    import json as _json
+    interviewers_for_preview = guide_content.get('interviewers') or []
+    fit_analysis = guide_content.get('fit_analysis') or {}
+    recent_news = guide_content.get('recent_news') or []
+
+    return render(request, "preview.html", {
+        "form_data": form_data,
+        "talking_points": guide_content.get('talking_points', []),
+        "questions_to_ask": guide_content.get('questions_to_ask', []),
+        "likely_questions": guide_content.get('likely_questions', []),
+        "interviewers": interviewers_for_preview,
+        "recent_news": recent_news,
+        "fit_analysis": fit_analysis,
+        # JSON blobs for hidden fields (pass-through to finalize)
+        "selected_news_json": _json.dumps(recent_news),
+        "interviewers_json": _json.dumps(interviewers_for_preview),
+        "fit_analysis_json": _json.dumps(fit_analysis),
+    })
+
+
+@require_http_methods(["POST"])
+def finalize_guide(request):
+    """Accept edited content from the preview page, build the final PDF."""
+    import json as _json
+
+    # Reconstruct form_data from hidden fields
+    form_data = {
+        "candidate_name": request.POST.get("candidate_name", "").strip(),
+        "job_title": request.POST.get("job_title", "").strip(),
+        "job_description": request.POST.get("job_description", ""),
+        "health_system_name": request.POST.get("health_system_name", "").strip(),
+        "health_system_info": request.POST.get("health_system_info", ""),
+        "health_system_website": request.POST.get("health_system_website", "").strip(),
+        "health_system_address": request.POST.get("health_system_address", "").strip(),
+        "interview_timezone": request.POST.get("interview_timezone", "CT"),
+        "interviewer_name": "",
+        "interviewer_title": "",
+        "interviewer_linkedin": "",
+        "interviewer_background": "",
+        "interview_date": request.POST.get("interview_date", "").strip(),
+        "interview_time": request.POST.get("interview_time", "").strip(),
+        "interview_format": request.POST.get("interview_format", "Video (Zoom/Teams)"),
+        "interview_location": request.POST.get("interview_location", "").strip(),
+        "contact_name": request.POST.get("contact_name", "").strip(),
+        "contact_email": request.POST.get("contact_email", "").strip(),
+        "contact_phone": request.POST.get("contact_phone", "").strip(),
+        "interview_tips": request.POST.get("interview_tips", ""),
+        "best_practices": request.POST.get("best_practices", ""),
+        "follow_up_tips": request.POST.get("follow_up_tips", ""),
+    }
+
+    # Read edited list fields (multiple values with same name)
+    talking_points = [t.strip() for t in request.POST.getlist("talking_point") if t.strip()]
+    questions_to_ask = [q.strip() for q in request.POST.getlist("question_to_ask") if q.strip()]
+    likely_questions = [q.strip() for q in request.POST.getlist("likely_question") if q.strip()]
+    fit_talking_points = [t.strip() for t in request.POST.getlist("fit_talking_point") if t.strip()]
+
+    # Reconstruct interviewers with edited insights
+    interviewers = []
+    try:
+        interviewers_raw = _json.loads(request.POST.get("interviewers_json", "[]"))
+    except (_json.JSONDecodeError, ValueError):
+        interviewers_raw = []
+    for idx, iv in enumerate(interviewers_raw):
+        edited_insights = request.POST.get(f"interviewer_insights_{idx}", iv.get("insights", ""))
+        iv["insights"] = edited_insights.strip()
+        # Also set custom_notes so the PDF builder uses the edited text verbatim
+        iv["custom_notes"] = edited_insights.strip()
+        interviewers.append(iv)
+
+    # Reconstruct news from edited fields
+    recent_news = []
+    for idx in range(10):
+        headline = request.POST.get(f"news_headline_{idx}", "").strip()
+        if not headline:
+            continue
+        recent_news.append({
+            "headline": headline,
+            "summary": request.POST.get(f"news_summary_{idx}", "").strip(),
+            "date": request.POST.get(f"news_date_{idx}", "").strip(),
+            "relevance": request.POST.get(f"news_relevance_{idx}", "").strip(),
+        })
+
+    # Reconstruct fit analysis from edited fields
+    fit_analysis = {}
+    try:
+        fit_raw = _json.loads(request.POST.get("fit_analysis_json", "{}"))
+    except (_json.JSONDecodeError, ValueError):
+        fit_raw = {}
+
+    # Matched strengths — read edited values, fall back to original
+    matched_strengths = []
+    for idx in range(20):
+        point = request.POST.get(f"fit_strength_point_{idx}", "").strip()
+        evidence = request.POST.get(f"fit_strength_evidence_{idx}", "").strip()
+        if point or evidence:
+            matched_strengths.append({"point": point, "evidence": evidence})
+    if matched_strengths:
+        fit_analysis["matched_strengths"] = matched_strengths
+    elif fit_raw.get("matched_strengths"):
+        fit_analysis["matched_strengths"] = fit_raw["matched_strengths"]
+
+    # Gaps
+    gaps = []
+    for idx in range(20):
+        gap = request.POST.get(f"fit_gap_gap_{idx}", "").strip()
+        framing = request.POST.get(f"fit_gap_framing_{idx}", "").strip()
+        if gap or framing:
+            gaps.append({"gap": gap, "framing": framing})
+    if gaps:
+        fit_analysis["gaps_to_address"] = gaps
+    elif fit_raw.get("gaps_to_address"):
+        fit_analysis["gaps_to_address"] = fit_raw["gaps_to_address"]
+
+    # Fit talking points (edited list)
+    if fit_talking_points:
+        fit_analysis["suggested_talking_points"] = fit_talking_points
+    elif fit_raw.get("suggested_talking_points"):
+        fit_analysis["suggested_talking_points"] = fit_raw["suggested_talking_points"]
+
+    # Story prompts
+    story_prompts = []
+    for idx in range(20):
+        prompt = request.POST.get(f"fit_story_prompt_{idx}", "").strip()
+        situation = request.POST.get(f"fit_story_situation_{idx}", "").strip()
+        if prompt or situation:
+            story_prompts.append({"prompt": prompt, "situation": situation})
+    if story_prompts:
+        fit_analysis["story_prompts"] = story_prompts
+    elif fit_raw.get("story_prompts"):
+        fit_analysis["story_prompts"] = fit_raw["story_prompts"]
+
+    # Assemble guide_content for the PDF builder
+    guide_content = {
+        "talking_points": talking_points,
+        "questions_to_ask": questions_to_ask,
+        "likely_questions": likely_questions,
+        "interviewer_insights": interviewers[0]["insights"] if interviewers else "",
+        "interviewers": interviewers,
+        "recent_news": recent_news,
+        "fit_analysis": fit_analysis,
+        "general_tips": GENERAL_TIPS,
+        "interview_tips": [t.strip() for t in form_data.get("interview_tips", "").splitlines() if t.strip()] or list(DEFAULT_INTERVIEW_TIPS),
+        "follow_up_tips": [t.strip() for t in form_data.get("follow_up_tips", "").splitlines() if t.strip()] or list(FOLLOW_UP_TIPS),
+        "day_of_checklist": [],  # included via Before the Interview cards, not a list
+    }
+
+    # Build the PDF
+    guide_id = str(uuid.uuid4())[:8]
     safe_name = form_data["candidate_name"].replace(" ", "_")
     filename = f"Interview_Guide_{safe_name}_{guide_id}.pdf"
     buffer = io.BytesIO()
