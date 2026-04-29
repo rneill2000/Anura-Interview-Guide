@@ -72,18 +72,22 @@ DAY_OF_CHECKLIST = [
 # ─── AI-GENERATED CONTENT ───────────────────────────────────────────────
 
 def _call_claude_with_search(prompt: str) -> str:
-    """Call Anthropic API with web search enabled for real-time news. Falls back to regular call."""
+    """Call Anthropic API with web search enabled for real-time news.
+
+    Does NOT fall back to a second Claude call on failure — that would chain
+    two sequential timeouts and blow past Railway's 30s edge limit.
+    """
     if not ANTHROPIC_API_KEY:
         logger.error("No ANTHROPIC_API_KEY set — skipping AI generation.")
         return ""
 
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=22.0)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=15.0)
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2000,
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
             messages=[{"role": "user", "content": prompt}],
         )
         # Extract text from response (may include tool use blocks)
@@ -94,8 +98,7 @@ def _call_claude_with_search(prompt: str) -> str:
         return "\n".join(text_parts) if text_parts else ""
     except Exception as e:
         logger.error(f"Claude API call with search failed: {e}")
-        # Fall back to regular call without search
-        return _call_claude(prompt)
+        return ""
 
 
 def _call_claude(prompt: str) -> str:
@@ -106,7 +109,7 @@ def _call_claude(prompt: str) -> str:
 
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=22.0)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=15.0)
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2000,
@@ -183,7 +186,7 @@ Job Description:
 {f"Interviewer: {form_data['interviewer_name']}, {form_data['interviewer_title']}" if form_data.get('interviewer_name') else ""}
 {f"Health System Context: {form_data['health_system_info']}" if form_data.get('health_system_info') else ""}
 
-Generate 5-6 thoughtful questions the candidate should ask the interviewer. These should:
+Generate 3-5 thoughtful questions the candidate should ask the interviewer. These should:
 - Show the candidate has done their homework on the health system and role
 - Demonstrate strategic thinking about the position
 - Help the candidate evaluate fit
@@ -205,10 +208,8 @@ Return ONLY a JSON array of strings. No markdown, no explanation."""
     return [
         "What does a typical day look like in this role?",
         "What are the biggest challenges the team is currently facing?",
-        "How does the team handle knowledge transfer and documentation?",
         f"What are {form_data['health_system_name']}'s top IT priorities for the next 12 months?",
         "How do you measure success for someone in this position?",
-        "What's the team culture like — how do people collaborate day-to-day?",
     ]
 
 
@@ -269,7 +270,7 @@ Job Description:
 
 {f"(Interviewer is {form_data['interviewer_name']}, {form_data['interviewer_title']} — useful flavor but DO NOT let it dominate the questions.)" if form_data.get('interviewer_name') else ""}
 
-Generate 6-8 questions the interviewer is likely to ask the candidate.
+Generate 3-5 questions the interviewer is likely to ask the candidate.
 
 PRIORITY ORDER — follow strictly:
 1. **Resume ↔ Job Description match** (PRIMARY). For each major requirement in the JD, ask the question an interviewer would most naturally ask to test whether the candidate has genuinely done that thing. Anchor each question in a specific item on the candidate's resume: a named module, employer, project, outcome, certification, or date. "Walk me through your Cadence template redesign at [employer]" is great; "Tell me about your experience" is not.
@@ -279,7 +280,7 @@ PRIORITY ORDER — follow strictly:
 
 Include a mix of:
 - Resume-grounded technical questions that map to JD requirements (MOST of the questions)
-- 1-2 behavioral questions tied to outcomes on the resume
+- 1 behavioral question tied to outcomes on the resume
 - 1 situational question about a healthcare-IT scenario relevant to the JD
 
 For each question, add a brief one-sentence tip in parentheses on how to approach the answer. Tips should reference the specific resume item the candidate should use in their answer whenever possible. Do NOT reference the STAR method or any specific interview framework.
@@ -300,10 +301,8 @@ Return ONLY a JSON array of strings. No markdown, no explanation. Example:
     return [
         f"Tell me about your experience with the technologies mentioned in the {form_data['job_title']} job description. (Tip: Be specific — name the modules, tools, or systems you've worked with.)",
         "Describe a challenging go-live or system implementation you supported. What was your role and how did you handle obstacles? (Tip: Walk through the situation, your specific actions, and the measurable outcome.)",
-        "How do you prioritize tasks when you have multiple urgent requests from different departments? (Tip: Give a real example showing your decision-making process.)",
         f"Why are you interested in working at {form_data['health_system_name']}? (Tip: Reference something specific about the organization — their mission, recent initiatives, or growth.)",
         "How do you handle pushback from clinical end-users during a system change or workflow update? (Tip: Show empathy for the user's perspective while explaining how you drive adoption.)",
-        "Where do you see yourself in 2-3 years? (Tip: Align your growth goals with the opportunities this role provides.)",
     ]
 
 
@@ -525,9 +524,9 @@ def generate_interview_guide(
                 logger.error(f"[{label}] {type(e).__name__} at t={round(_time.time()-_t0,2)}s — fallback")
                 results[label] = default
 
-        talking_points   = results["talking_points"]
-        questions_to_ask = results["questions_to_ask"]
-        likely_questions = results["likely_questions"]
+        talking_points   = results["talking_points"][:7]
+        questions_to_ask = results["questions_to_ask"][:5]
+        likely_questions = results["likely_questions"][:5]
         fit_analysis     = results["fit_analysis"]
 
         # Attach each interviewer's insights (custom_notes wins if present)
