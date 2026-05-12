@@ -380,6 +380,36 @@ Rules:
         return {}
 
 
+def _generate_about_info(health_system_name: str, website_url: str) -> str:
+    """Fetch a health system's website and return a concise About summary.
+
+    Uses Claude with web search to visit the site, find the About/mission
+    content, and condense it into 3-5 sentences suitable for the interview
+    guide's 'About the Health System' field.
+    """
+    prompt = f"""Visit {website_url} and find the "About Us", "About", "Our Mission", "Who We Are",
+or similar page for {health_system_name}.
+
+Summarize the health system in 3-5 sentences covering:
+- What they are (hospital, health system, academic medical center, etc.)
+- Size and scope (number of hospitals, clinics, employees, beds if available)
+- Mission or values
+- Geographic service area
+- Any notable specialties, rankings, or affiliations (e.g. academic, research, Epic environment)
+
+Write in third person, factual tone. Do NOT include any JSON formatting — return ONLY the plain text summary paragraph.
+If you cannot access the site or find About information, return a brief summary based on what you know about {health_system_name}."""
+
+    result = _call_claude_with_search(prompt)
+    if result:
+        # Strip any markdown formatting the model might add
+        cleaned = result.strip()
+        if cleaned.startswith('"') and cleaned.endswith('"'):
+            cleaned = cleaned[1:-1]
+        return cleaned
+    return ""
+
+
 def _generate_recent_news(form_data: dict) -> list[dict]:
     """AI-generated recent news about the health system using web search.
 

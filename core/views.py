@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect
 from django.http import FileResponse, Http404, JsonResponse
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
-from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS, GENERAL_TIPS, FOLLOW_UP_TIPS, _generate_recent_news
+from guide_generator.generator import generate_interview_guide, DEFAULT_INTERVIEW_TIPS, GENERAL_TIPS, FOLLOW_UP_TIPS, _generate_recent_news, _generate_about_info
 from guide_generator.pdf_builder import build_guide_pdf
 
 logger = logging.getLogger(__name__)
@@ -447,6 +447,33 @@ def fetch_news(request):
 
     news = _generate_recent_news({"health_system_name": health_system_name})
     return JsonResponse({"news": news})
+
+
+@require_http_methods(["POST"])
+def fetch_about_info(request):
+    """AJAX endpoint: fetch and summarize a health system's About page."""
+    import json
+    try:
+        body = json.loads(request.body)
+        website_url = (body.get("website_url") or "").strip()
+        health_system_name = (body.get("health_system_name") or "").strip()
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON."}, status=400)
+
+    if not website_url:
+        return JsonResponse({"ok": False, "error": "Please enter a website URL first."})
+    if not health_system_name:
+        return JsonResponse({"ok": False, "error": "Please enter the health system name first."})
+
+    try:
+        about_text = _generate_about_info(health_system_name, website_url)
+        if about_text:
+            return JsonResponse({"ok": True, "about": about_text})
+        else:
+            return JsonResponse({"ok": False, "error": "Could not retrieve About information."})
+    except Exception:
+        logger.exception("fetch_about_info failed")
+        return JsonResponse({"ok": False, "error": "Failed to fetch About info. Please try again."}, status=500)
 
 
 @require_http_methods(["POST"])

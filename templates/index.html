@@ -125,6 +125,27 @@
                        class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
             </div>
         </div>
+        <!-- Fetch About Info Button -->
+        <div class="mb-4">
+            <button type="button" id="fetchAboutBtn" onclick="fetchAboutInfo()"
+                    class="inline-flex items-center px-4 py-2 bg-anura-50 hover:bg-anura-100 text-anura-600 font-medium rounded-lg text-xs transition-all duration-200 border border-anura-200">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span id="fetchAboutBtnText">Fetch About Info</span>
+                <span id="fetchAboutSpinner" class="hidden">
+                    <svg class="animate-spin ml-1 h-3.5 w-3.5 text-anura-500 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </span>
+            </button>
+            <span class="text-xs text-gray-400 ml-2">Uses AI to pull About info from the health system's website</span>
+        </div>
+        <div id="aboutError" class="hidden mb-4">
+            <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2.5 rounded-lg text-xs"></div>
+        </div>
+
         <!-- Fetch News Button -->
         <div class="mb-4">
             <button type="button" id="fetchNewsBtn" onclick="fetchRecentNews()"
@@ -498,6 +519,70 @@ document.getElementById('guideForm').addEventListener('submit', function() {
     btn.disabled = true;
     btn.classList.add('opacity-70', 'cursor-wait');
 });
+
+function fetchAboutInfo() {
+    const websiteUrl = (document.getElementById('health_system_website') || {}).value.trim();
+    const healthSystemName = (document.getElementById('health_system_name') || {}).value.trim();
+    const errorDiv = document.getElementById('aboutError');
+
+    if (!websiteUrl) {
+        errorDiv.classList.remove('hidden');
+        errorDiv.querySelector('div').textContent = 'Please enter a website URL first.';
+        return;
+    }
+    if (!healthSystemName) {
+        errorDiv.classList.remove('hidden');
+        errorDiv.querySelector('div').textContent = 'Please enter the health system name first.';
+        return;
+    }
+
+    const btn = document.getElementById('fetchAboutBtn');
+    const btnText = document.getElementById('fetchAboutBtnText');
+    const spinner = document.getElementById('fetchAboutSpinner');
+
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-wait');
+    btnText.textContent = 'Fetching...';
+    spinner.classList.remove('hidden');
+    errorDiv.classList.add('hidden');
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch('{% url "fetch_about_info" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ website_url: websiteUrl, health_system_name: healthSystemName }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-wait');
+        btnText.textContent = 'Fetch About Info';
+        spinner.classList.add('hidden');
+
+        if (!data.ok) {
+            errorDiv.classList.remove('hidden');
+            errorDiv.querySelector('div').textContent = data.error || 'Could not fetch About info.';
+            return;
+        }
+        // Fill the About textarea
+        var aboutField = document.getElementById('health_system_info');
+        if (aboutField) {
+            aboutField.value = data.about;
+            aboutField.classList.add('ring-2', 'ring-anura-200');
+            setTimeout(function() { aboutField.classList.remove('ring-2', 'ring-anura-200'); }, 1500);
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-wait');
+        btnText.textContent = 'Fetch About Info';
+        spinner.classList.add('hidden');
+        errorDiv.classList.remove('hidden');
+        errorDiv.querySelector('div').textContent = 'Failed to fetch About info. Please try again.';
+        console.error('About fetch error:', err);
+    });
+}
 
 function fetchRecentNews() {
     const healthSystemName = document.getElementById('health_system_name').value.trim();

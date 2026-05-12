@@ -9,6 +9,7 @@ urlpatterns = [
     path('finalize/', views.finalize_guide, name='finalize_guide'),
     path('download/<str:filename>/', views.download_guide, name='download_guide'),
     path('fetch-news/', views.fetch_news, name='fetch_news'),
+    path('fetch-about-info/', views.fetch_about_info, name='fetch_about_info'),
     path('fetch-interviewer-notes/', views.fetch_interviewer_notes, name='fetch_interviewer_notes'),
     path('bullhorn/candidates/', views.bullhorn_candidate_search, name='bullhorn_candidate_search'),
     path('bullhorn/jobs/', views.bullhorn_job_search, name='bullhorn_job_search'),
