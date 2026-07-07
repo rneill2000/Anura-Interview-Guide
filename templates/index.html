@@ -6,7 +6,7 @@
 <!-- Hero / intro -->
 <div class="text-center mb-10">
     <h1 class="text-3xl font-bold text-anura-950 tracking-tight mb-3">Create an Interview Preparation Guide</h1>
-    <p class="text-gray-500 text-base max-w-xl mx-auto leading-relaxed">Fill in the details below and we'll generate a personalized prep guide for your candidate — complete with tailored talking points, smart questions to ask, and day-of logistics.</p>
+    <p class="text-gray-500 text-base max-w-xl mx-auto leading-relaxed">Fill in the details below and we'll generate a prep guide for a role at a health system — complete with tailored talking points, smart questions to ask, and day-of logistics. Add candidate details (name, resume, fit analysis) to personalize it, or leave them blank for a general guide.</p>
 </div>
 
 {% if error %}
@@ -76,11 +76,12 @@
         <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-4">Candidate &amp; Role</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
-                <label for="candidate_name" class="block text-sm font-medium text-gray-700 mb-1">Candidate Name <span class="text-red-500">*</span></label>
+                <label for="candidate_name" class="block text-sm font-medium text-gray-700 mb-1">Candidate Name <span class="text-gray-400 font-normal">(optional)</span></label>
                 <input type="text" id="candidate_name" name="candidate_name"
-                       value="{{ form_data.candidate_name|default:'' }}" required
-                       placeholder="Jane Smith"
+                       value="{{ form_data.candidate_name|default:'' }}"
+                       placeholder="Leave blank for a general guide"
                        class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-anura-100 focus:border-anura-500 outline-none transition">
+                <p class="text-xs text-gray-400 mt-1">Leave blank to create a general guide for this role &amp; health system. Add a name (plus resume / fit analysis below) to personalize it.</p>
             </div>
             <div>
                 <label for="job_title" class="block text-sm font-medium text-gray-700 mb-1">Job Title <span class="text-red-500">*</span></label>

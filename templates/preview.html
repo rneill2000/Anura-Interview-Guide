@@ -51,7 +51,7 @@
     <div class="bg-anura-50 border border-anura-100 rounded-xl p-4 mb-6">
         <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
-                <p class="text-sm font-semibold text-anura-900">{{ form_data.candidate_name }}</p>
+                <p class="text-sm font-semibold text-anura-900">{% if form_data.candidate_name %}{{ form_data.candidate_name }}{% else %}General Guide{% endif %}</p>
                 <p class="text-xs text-anura-600">{{ form_data.job_title }} at {{ form_data.health_system_name }}</p>
             </div>
             {% if form_data.interview_date %}

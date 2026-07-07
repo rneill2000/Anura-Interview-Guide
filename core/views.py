@@ -210,8 +210,10 @@ def generate_guide(request):
         "follow_up_tips": _c(request.POST.get("follow_up_tips", "")),
     }
 
-    # Validate required fields
-    required = ["candidate_name", "job_title", "job_description", "health_system_name"]
+    # Validate required fields — candidate_name is now OPTIONAL so the tool
+    # can produce a general guide for a health system/role. Candidate-specific
+    # inputs (name, resume, fit analysis) simply personalize it when provided.
+    required = ["job_title", "job_description", "health_system_name"]
     missing = [f for f in required if not form_data[f]]
     if missing:
         return render(request, "index.html", {
@@ -412,9 +414,10 @@ def finalize_guide(request):
         "day_of_checklist": [],  # included via Before the Interview cards, not a list
     }
 
-    # Build the PDF
+    # Build the PDF — filename uses candidate name if given, else the health system
     guide_id = str(uuid.uuid4())[:8]
-    safe_name = form_data["candidate_name"].replace(" ", "_")
+    base_name = form_data["candidate_name"] or form_data["health_system_name"] or "General"
+    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", base_name).strip("_")
     filename = f"Interview_Guide_{safe_name}_{guide_id}.pdf"
     buffer = io.BytesIO()
     build_guide_pdf(guide_content, form_data, buffer)

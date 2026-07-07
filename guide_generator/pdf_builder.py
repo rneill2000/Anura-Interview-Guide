@@ -186,7 +186,12 @@ def _draw_cover(canvas, doc, form_data):
     y -= 16
     canvas.setFillColor(LIGHT_BLUE_2)
     canvas.setFont("Helvetica", 13)
-    canvas.drawString(72, y, f"Prepared for {form_data['candidate_name']}")
+    candidate_name = (form_data.get('candidate_name') or '').strip()
+    if candidate_name:
+        prepared_line = f"Prepared for {candidate_name}"
+    else:
+        prepared_line = f"Prepared for {form_data['job_title']} Candidates"
+    canvas.drawString(72, y, prepared_line)
 
     # Date
     if form_data.get('interview_date'):
