@@ -514,6 +514,111 @@ def fetch_interviewer_notes(request):
         return JsonResponse({"ok": False, "error": "Could not draft interviewer notes."}, status=500)
 
 
+# -- Guide template endpoints ----------------------------------------------
+# Templates store everything EXCEPT candidate-specific details (name, resume,
+# fit analysis) so one template can be reused across many candidates.
+
+# Whitelist of form fields a template may contain. Anything else posted is
+# dropped — keeps candidate data and junk out of saved templates.
+TEMPLATE_FIELDS = {
+    "job_title", "job_description",
+    "health_system_name", "health_system_info",
+    "health_system_website", "health_system_address",
+    "interview_timezone", "interview_format", "interview_location",
+    "contact_name", "contact_email", "contact_phone",
+    "interview_tips", "best_practices", "follow_up_tips",
+    "interviewers",  # list of {name,title,linkedin,background,custom_notes}
+}
+
+
+def _clean_template_payload(payload: dict) -> dict:
+    """Keep only whitelisted fields; sanitize the interviewers list."""
+    cleaned = {}
+    for key in TEMPLATE_FIELDS:
+        if key not in payload:
+            continue
+        value = payload[key]
+        if key == "interviewers":
+            if isinstance(value, list):
+                ivs = []
+                for iv in value[:5]:
+                    if isinstance(iv, dict) and (iv.get("name") or "").strip():
+                        ivs.append({
+                            "name": str(iv.get("name", ""))[:200],
+                            "title": str(iv.get("title", ""))[:200],
+                            "linkedin": str(iv.get("linkedin", ""))[:400],
+                            "background": str(iv.get("background", ""))[:5000],
+                            "custom_notes": str(iv.get("custom_notes", ""))[:5000],
+                        })
+                cleaned[key] = ivs
+        elif isinstance(value, str):
+            cleaned[key] = value[:20000]
+    return cleaned
+
+
+@require_http_methods(["GET"])
+def list_templates(request):
+    """AJAX: list saved templates (id, name, health system, job title, updated)."""
+    from core.models import GuideTemplate
+    items = [
+        {
+            "id": t.id,
+            "name": t.name,
+            "health_system_name": (t.payload or {}).get("health_system_name", ""),
+            "job_title": (t.payload or {}).get("job_title", ""),
+            "updated_at": t.updated_at.strftime("%b %d, %Y"),
+        }
+        for t in GuideTemplate.objects.all()[:100]
+    ]
+    return JsonResponse({"ok": True, "templates": items})
+
+
+@require_http_methods(["POST"])
+def save_template(request):
+    """AJAX: create or update (upsert by name) a template."""
+    import json
+    from core.models import GuideTemplate
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON."}, status=400)
+
+    name = (body.get("name") or "").strip()[:200]
+    if not name:
+        return JsonResponse({"ok": False, "error": "Template name required."})
+
+    payload = _clean_template_payload(body.get("payload") or {})
+    if not payload.get("health_system_name") and not payload.get("job_title"):
+        return JsonResponse({"ok": False, "error": "Fill in at least the health system or job title before saving."})
+
+    template, created = GuideTemplate.objects.update_or_create(
+        name=name, defaults={"payload": payload}
+    )
+    return JsonResponse({"ok": True, "id": template.id, "created": created})
+
+
+@require_http_methods(["GET"])
+def get_template(request, template_id):
+    """AJAX: fetch one template's full payload."""
+    from core.models import GuideTemplate
+    try:
+        t = GuideTemplate.objects.get(id=template_id)
+    except GuideTemplate.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Template not found."}, status=404)
+    return JsonResponse({"ok": True, "id": t.id, "name": t.name, "payload": t.payload or {}})
+
+
+@require_http_methods(["POST"])
+def delete_template(request, template_id):
+    """AJAX: delete a template."""
+    from core.models import GuideTemplate
+    deleted, _ = GuideTemplate.objects.filter(id=template_id).delete()
+    if not deleted:
+        return JsonResponse({"ok": False, "error": "Template not found."}, status=404)
+    return JsonResponse({"ok": True})
+
+
 # -- Bullhorn API endpoints ------------------------------------------------
 
 def bullhorn_candidate_search(request):
