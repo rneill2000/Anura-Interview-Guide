@@ -44,6 +44,42 @@ PAGE_W, PAGE_H = letter
 MARGIN = 58
 
 
+def _normalize_multiline(text):
+    """
+    Clean pasted/AI text for PDF rendering: merge line breaks that fall
+    mid-sentence (a line not ending in terminal punctuation, or a line
+    starting lowercase/with punctuation, belongs to the previous one) while
+    preserving intentional paragraph breaks (blank lines or sentence ends).
+    Prevents fragments like ", and" hanging on their own line.
+    """
+    if not text:
+        return text
+    lines = [ln.rstrip() for ln in text.split('\n')]
+    paras = []
+    buf = ''
+    for ln in lines:
+        stripped = ln.strip()
+        if not stripped:
+            if buf:
+                paras.append(buf)
+                buf = ''
+            continue
+        if not buf:
+            buf = stripped
+            continue
+        prev_ends_sentence = buf[-1] in '.!?:"”)'
+        next_continues = stripped[0].islower() or stripped[0] in ',;)&—-'
+        if not prev_ends_sentence or next_continues:
+            sep = '' if stripped[0] in ',;.' else ' '
+            buf += sep + stripped
+        else:
+            paras.append(buf)
+            buf = stripped
+    if buf:
+        paras.append(buf)
+    return '\n\n'.join(paras)
+
+
 def _styles():
     """Build all paragraph styles."""
     s = {}
@@ -200,14 +236,21 @@ def _draw_cover(canvas, doc, form_data):
         canvas.setFont("Helvetica", 11)
         tz = form_data.get('interview_timezone', '')
         date_str = form_data['interview_date']
+        # Format date nicely: 2026-07-29 -> Wednesday, July 29, 2026
+        try:
+            from datetime import datetime
+            d = datetime.strptime(date_str, '%Y-%m-%d')
+            date_str = f"{d.strftime('%A')}, {d.strftime('%B')} {d.day}, {d.year}"
+        except Exception:
+            pass
         if form_data.get('interview_time'):
             # Format time nicely
             try:
                 from datetime import datetime
                 t = datetime.strptime(form_data['interview_time'], '%H:%M')
-                date_str += f"  \u2502  {t.strftime('%I:%M %p').lstrip('0')}"
+                date_str += f"  \u2022  {t.strftime('%I:%M %p').lstrip('0')}"
             except Exception:
-                date_str += f"  \u2502  {form_data['interview_time']}"
+                date_str += f"  \u2022  {form_data['interview_time']}"
         if tz:
             date_str += f" {tz}"
         canvas.drawString(72, y, date_str)
@@ -588,7 +631,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MED_GRAY)
         canvas.drawCentredString(PAGE_W / 2, 24,
-            "Prepared by Anura Connect  \u2502  anuraconnect.com  \u2502  Confidential")
+            "Prepared by Anura Connect  \u2022  anuraconnect.com  \u2022  Confidential")
         # Thin footer line
         canvas.setStrokeColor(BORDER_GRAY)
         canvas.setLineWidth(0.5)
@@ -629,7 +672,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     if has_about_content or form_data.get('health_system_name'):
         about_first = []
         if about_detail_parts:
-            about_first.append(Paragraph("  \u2502  ".join(about_detail_parts), styles['body']))
+            about_first.append(Paragraph("  \u2022  ".join(about_detail_parts), styles['body']))
         _section_divider(
             story,
             f"The Health System: {form_data['health_system_name']}" if form_data.get('health_system_name') else "The Health System",
@@ -638,8 +681,9 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
             keep_with_next=about_first,
         )
         if form_data.get('health_system_info'):
-            info = form_data['health_system_info'].replace('\n', '<br/>')
-            story.append(Paragraph(info, styles['body']))
+            info = _normalize_multiline(form_data['health_system_info'])
+            for para in info.split('\n\n'):
+                story.append(Paragraph(para, styles['body']))
         elif not about_detail_parts and form_data.get('health_system_name'):
             story.append(Paragraph(
                 f"Visit {form_data['health_system_name']}\u2019s website to learn about their mission, values, and recent initiatives before your interview.",
@@ -844,12 +888,6 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
                 story.append(Spacer(1, 6))
 
     # ── Pre-Interview Essentials (2x2 card grid) ──
-    logistics_subtitle = [Paragraph(
-        "Complete these steps before your interview to set yourself up for success.",
-        styles['section_subtitle'],
-    )]
-    _section_divider(story, "Before the Interview", styles, icon_key="logistics", keep_with_next=logistics_subtitle)
-
     is_virtual = any(k in form_data.get('interview_format', '').lower()
                      for k in ('video', 'zoom', 'teams', 'phone'))
 
@@ -887,7 +925,13 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
-    story.append(grid)
+    # Heading + subtitle + card grid move as one block so the section
+    # header is never stranded at the bottom of a page.
+    logistics_subtitle = [Paragraph(
+        "Complete these steps before your interview to set yourself up for success.",
+        styles['section_subtitle'],
+    ), grid]
+    _section_divider(story, "Before the Interview", styles, icon_key="logistics", keep_with_next=logistics_subtitle)
 
     # ── Key Talking Points ──
     if guide_content.get('talking_points'):
@@ -965,7 +1009,7 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
 
         contact_content = [
             [Paragraph("Your Anura Connect Contact", styles['contact_title'])],
-            [Paragraph("  \u2502  ".join(parts), styles['contact_info'])],
+            [Paragraph("  \u2022  ".join(parts), styles['contact_info'])],
             [Paragraph("Reach out with any questions before your interview \u2014 we're here to help you succeed.",
                         styles['contact_cta'])],
         ]
