@@ -441,6 +441,10 @@
 
     <!-- Submit -->
     <div class="text-center pt-2">
+        <button type="button" onclick="saveCurrentAsTemplate()"
+                class="inline-flex items-center justify-center px-6 py-3 mr-3 bg-white border border-anura-300 text-anura-600 hover:bg-anura-50 font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-anura-100 focus:ring-offset-2">
+            Save as Template
+        </button>
         <button type="submit" id="submitBtn"
                 class="inline-flex items-center justify-center px-8 py-3 bg-anura-500 hover:bg-anura-600 text-white font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow focus:ring-2 focus:ring-anura-100 focus:ring-offset-2">
             <span class="btn-text">Generate Interview Guide</span>
@@ -452,6 +456,7 @@
                 Generating...
             </span>
         </button>
+        <p id="templateStatusBottom" class="hidden text-xs mt-3"></p>
     </div>
 </form>
 
@@ -507,12 +512,14 @@ const TEMPLATE_SCALAR_FIELDS = [
 ];
 
 function templateStatus(msg, isError) {
-    const el = document.getElementById('templateStatus');
-    if (!el) return;
-    el.classList.remove('hidden', 'text-red-500', 'text-green-600');
-    el.classList.add(isError ? 'text-red-500' : 'text-green-600');
-    el.textContent = msg;
-    setTimeout(function() { el.classList.add('hidden'); }, 5000);
+    ['templateStatus', 'templateStatusBottom'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('hidden', 'text-red-500', 'text-green-600');
+        el.classList.add(isError ? 'text-red-500' : 'text-green-600');
+        el.textContent = msg;
+        setTimeout(function() { el.classList.add('hidden'); }, 5000);
+    });
 }
 
 function refreshTemplateList(selectId) {
