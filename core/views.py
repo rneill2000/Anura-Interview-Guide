@@ -447,6 +447,22 @@ def finalize_guide(request):
     build_guide_pdf(guide_content, form_data, buffer)
     buffer.seek(0)
 
+    # Persist to the database so it can be re-downloaded or re-edited anytime
+    try:
+        from core.models import GeneratedGuide
+        saved_form = dict(form_data)
+        saved_form["interviewers"] = interviewers
+        GeneratedGuide.objects.create(
+            candidate_name=form_data.get("candidate_name", ""),
+            job_title=form_data.get("job_title", ""),
+            health_system_name=form_data.get("health_system_name", ""),
+            filename=filename,
+            pdf=buffer.getvalue(),
+            form_data=saved_form,
+        )
+    except Exception as e:
+        logger.warning(f"Could not save guide to library: {e}")
+
     response = FileResponse(
         buffer,
         as_attachment=True,
@@ -717,6 +733,43 @@ def download_guide(request, filename):
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["X-Content-Type-Options"] = "nosniff"
     return response
+def guides_list(request):
+    """Past Guides library page."""
+    from core.models import GeneratedGuide
+    guides = GeneratedGuide.objects.only(
+        "id", "candidate_name", "job_title", "health_system_name", "filename", "created_at"
+    )[:200]
+    return render(request, "guides.html", {"guides": guides})
+
+
+def guide_download(request, guide_id):
+    """Serve a stored guide PDF from the database."""
+    from core.models import GeneratedGuide
+    try:
+        g = GeneratedGuide.objects.get(id=guide_id)
+    except GeneratedGuide.DoesNotExist:
+        raise Http404("Guide not found.")
+    response = FileResponse(
+        io.BytesIO(g.pdf),
+        as_attachment=True,
+        filename=g.filename,
+        content_type="application/pdf",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{g.filename}"'
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def guide_payload(request, guide_id):
+    """Form data for a stored guide, for loading back into the form."""
+    from core.models import GeneratedGuide
+    try:
+        g = GeneratedGuide.objects.get(id=guide_id)
+    except GeneratedGuide.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Guide not found."}, status=404)
+    return JsonResponse({"ok": True, "form_data": g.form_data})
+
+
 def debug_claude(request):
     """Diagnostic endpoint: check if Claude API is actually working."""
     import time

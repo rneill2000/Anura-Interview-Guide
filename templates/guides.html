@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Past Guides{% endblock %}
+
+{% block content %}
+<div class="text-center mb-8">
+    <h1 class="text-2xl font-bold text-anura-950 tracking-tight mb-2">Past Guides</h1>
+    <p class="text-gray-500 text-sm max-w-xl mx-auto">Every guide you've generated, saved permanently. Re-download any of them, or load one back into the form to make changes and regenerate.</p>
+</div>
+
+{% if guides %}
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+    {% for g in guides %}
+    <div class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
+        <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-anura-900 truncate">
+                {{ g.candidate_name|default:"General guide" }}
+                {% if g.job_title %}<span class="text-gray-400 font-normal">—</span> {{ g.job_title }}{% endif %}
+            </p>
+            <p class="text-xs text-gray-400 mt-0.5">
+                {{ g.health_system_name }}{% if g.health_system_name %} · {% endif %}{{ g.created_at|date:"M j, Y g:i A" }}
+            </p>
+        </div>
+        <div class="flex items-center gap-2 ml-4 flex-shrink-0">
+            <a href="{% url 'guide_download' g.id %}"
+               class="text-xs bg-anura-500 text-white px-3 py-1.5 rounded-lg hover:bg-anura-600 transition font-medium">
+                Download PDF
+            </a>
+            <button type="button" onclick="loadGuideIntoForm({{ g.id }})"
+                    class="text-xs border border-anura-300 text-anura-600 px-3 py-1.5 rounded-lg hover:bg-anura-50 transition font-medium">
+                Edit in Form
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+    <p class="text-gray-400 text-sm">No guides yet — guides you generate from now on will appear here automatically.</p>
+    <a href="/" class="inline-block mt-4 text-sm text-anura-600 font-semibold hover:text-anura-700">Create a guide &rarr;</a>
+</div>
+{% endif %}
+
+<script>
+// Load a past guide's details into the form: convert the stored form data to
+// the same localStorage format the form's auto-restore already understands.
+function loadGuideIntoForm(id) {
+    fetch('/guides/' + id + '/payload/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) { alert(data.error || 'Could not load guide.'); return; }
+            const fd = data.form_data || {};
+            const out = {};
+            Object.keys(fd).forEach(function(k) {
+                if (k === 'interviewers') return;
+                if (typeof fd[k] === 'string') out[k] = fd[k];
+            });
+            out.__interviewers__ = (fd.interviewers || []).map(function(iv) {
+                return {
+                    name: iv.name || '', title: iv.title || '', linkedin: iv.linkedin || '',
+                    background: iv.background || '', custom_notes: iv.custom_notes || iv.insights || '',
+                };
+            });
+            try { localStorage.setItem('interviewGuideFormData', JSON.stringify(out)); } catch(e) {}
+            window.location = '/?edit=1';
+        })
+        .catch(function() { alert('Could not load guide.'); });
+}
+</script>
+{% endblock %}

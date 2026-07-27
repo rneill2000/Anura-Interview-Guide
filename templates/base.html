@@ -63,6 +63,9 @@
                 <img src="{% static 'images/anura_logo.png' %}" alt="Anura Connect" class="h-10">
             </a>
             <span class="flex items-center gap-4">
+                {% if user.is_authenticated %}
+                <a href="{% url 'guides_list' %}" class="text-sm text-anura-600 font-medium hover:text-anura-700 transition">Past Guides</a>
+                {% endif %}
                 <span class="text-anura-900 text-sm font-medium hidden sm:block">Interview Guide Generator</span>
                 {% if user.is_authenticated %}
                 <form method="post" action="{% url 'logout' %}" class="inline">
