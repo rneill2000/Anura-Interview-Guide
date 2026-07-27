@@ -62,7 +62,15 @@
             <a href="/" class="flex items-center gap-3 no-underline">
                 <img src="{% static 'images/anura_logo.png' %}" alt="Anura Connect" class="h-10">
             </a>
-            <span class="text-anura-900 text-sm font-medium hidden sm:block">Interview Guide Generator</span>
+            <span class="flex items-center gap-4">
+                <span class="text-anura-900 text-sm font-medium hidden sm:block">Interview Guide Generator</span>
+                {% if user.is_authenticated %}
+                <form method="post" action="{% url 'logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="text-xs text-gray-400 hover:text-anura-600 font-medium transition">Sign out</button>
+                </form>
+                {% endif %}
+            </span>
         </div>
     </header>
 
