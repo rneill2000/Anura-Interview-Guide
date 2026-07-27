@@ -27,6 +27,9 @@ class Command(BaseCommand):
         User = get_user_model()
         user, created = User.objects.get_or_create(username=username)
         user.is_staff = True  # allows /admin access with the same login
-        user.set_password(password)
+        # Only re-hash if the password actually changed — re-hashing on every
+        # deploy invalidates all active sessions (logs everyone out mid-use).
+        if created or not user.check_password(password):
+            user.set_password(password)
         user.save()
         self.stdout.write(f"{'Created' if created else 'Updated'} login user '{username}'.")
