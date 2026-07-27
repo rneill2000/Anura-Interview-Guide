@@ -457,6 +457,10 @@
             </span>
         </button>
         <p id="templateStatusBottom" class="hidden text-xs mt-3"></p>
+        <button type="button" onclick="startCleanForm()"
+                class="mt-4 text-sm text-gray-400 hover:text-red-500 font-medium transition underline-offset-2 hover:underline">
+            Clear form &amp; start over
+        </button>
     </div>
 </form>
 
@@ -718,6 +722,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // Clear saved data after a successful download
 function clearAutoSave() {
     try { localStorage.removeItem(AUTOSAVE_KEY); } catch(e) {}
+}
+
+// "Clear form & start over" — wipe the auto-save and reload blank.
+function startCleanForm() {
+    if (!confirm('Clear the whole form? Tip: click "Save as Template" first if you want to keep this setup for later.')) return;
+    clearAutoSave();
+    window.location = '?new=1';
 }
 
 // ── Submit form (navigates to preview page) ────
