@@ -77,6 +77,24 @@
         </div>
     </header>
 
+    <script>
+    // If the signed-in session expires, background requests get redirected to
+    // the login page and would otherwise fail silently. Detect that and send
+    // the browser to the login page instead, returning here afterwards.
+    (function() {
+        const origFetch = window.fetch;
+        window.fetch = function() {
+            return origFetch.apply(this, arguments).then(function(r) {
+                if ((r.redirected && r.url.indexOf('/login') !== -1) || r.status === 401) {
+                    window.location = '/login/?next=' + encodeURIComponent(window.location.pathname);
+                    throw new Error('Session expired — redirecting to sign in.');
+                }
+                return r;
+            });
+        };
+    })();
+    </script>
+
     <!-- Main content -->
     <main class="flex-1">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
