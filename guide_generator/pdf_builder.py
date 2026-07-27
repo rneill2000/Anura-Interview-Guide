@@ -178,9 +178,9 @@ def _draw_cover(canvas, doc, form_data):
         y = PAGE_H - (PAGE_H * (i + 1) / steps)
         canvas.rect(0, y, PAGE_W, PAGE_H / steps + 1, fill=1, stroke=0)
 
-    # Logo
+    # Logo — white variant so it's visible on the navy cover
     try:
-        from guide_generator.logo_data import LOGO_BASE64
+        from guide_generator.logo_data import LOGO_WHITE_BASE64 as LOGO_BASE64
         logo_b64 = LOGO_BASE64.split(",", 1)[1]
         logo_bytes = base64.b64decode(logo_b64)
         logo_img = ImageReader(io.BytesIO(logo_bytes))
@@ -657,7 +657,12 @@ def build_guide_pdf(guide_content: dict, form_data: dict, output_path: Path):
     # ── The Role ──
     first_content = [Paragraph(form_data['job_title'], styles['role_title']), Spacer(1, 4)]
     _section_divider(story, "The Role", styles, icon_key="the_role", keep_with_next=first_content)
-    _render_job_description(story, form_data['job_description'], styles, content_width)
+    # Don't repeat the job title if the JD text starts with it (it's already the heading)
+    jd_text = (form_data['job_description'] or '').lstrip()
+    jt = (form_data.get('job_title') or '').strip()
+    if jt and jd_text.lower().startswith(jt.lower()):
+        jd_text = jd_text[len(jt):].lstrip(' \t-–—:|.')
+    _render_job_description(story, jd_text, styles, content_width)
 
     # ── The Health System (About the Client) ──
     # Only render this section if we have at least one piece of content for it.

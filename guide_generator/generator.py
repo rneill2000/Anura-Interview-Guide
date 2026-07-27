@@ -241,7 +241,9 @@ Role being interviewed for: {form_data['job_title']}
 
 Write a concise 2-3 sentence summary covering: what this person likely cares about given their role, and one tip for connecting with them in the interview.
 
-Keep it tight and actionable. No fluff. Do NOT invent biographical details — only work with what's provided. If little info is given, focus on what their title tells us about their perspective."""
+Keep it tight and actionable. No fluff. Do NOT invent biographical details — only work with what's provided. If little info is given, focus on what their title tells us about their perspective.
+
+Do NOT start with the person's name or repeat their name/title as a header — the guide already displays those directly above this text. Start straight in on the substance (e.g. "As a former Epic employee, she likely prioritizes...")."""
 
     result = _call_claude(prompt)
     return result if result else ""
