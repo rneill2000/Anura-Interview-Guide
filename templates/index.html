@@ -230,6 +230,7 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
         <h2 class="text-sm font-semibold text-anura-500 uppercase tracking-wide mb-1">Candidate Resume</h2>
         <p class="text-xs text-gray-400 mb-4">Optional. Upload or paste the candidate's resume — we use it to tailor talking points to what's actually on their resume and to anticipate the resume-specific questions an interviewer is likely to ask.</p>
+        <div id="bhResumeStatus" class="hidden text-xs rounded-lg px-4 py-3 mb-4"></div>
         <div class="mb-4">
             <label for="candidate_resume_file" class="block text-sm font-medium text-gray-700 mb-1">Upload Resume (PDF, DOCX, or TXT)</label>
             <input type="file" id="candidate_resume_file" name="candidate_resume_file"
@@ -1160,6 +1161,46 @@ function selectCandidate(c) {
     const field = document.getElementById('candidate_name');
     field.classList.add('ring-2', 'ring-anura-200');
     setTimeout(function() { field.classList.remove('ring-2', 'ring-anura-200'); }, 1500);
+    // Pull their resume from Bullhorn (prefers the Anura Connect version)
+    fetchBullhornResume(c.id);
+}
+
+function bhResumeStatus(html, tone) {
+    const el = document.getElementById('bhResumeStatus');
+    if (!el) return;
+    el.className = 'text-xs rounded-lg px-4 py-3 mb-4 border ' + (
+        tone === 'ok'   ? 'bg-green-50 border-green-200 text-green-700' :
+        tone === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+        tone === 'err'  ? 'bg-red-50 border-red-200 text-red-600' :
+                          'bg-gray-50 border-gray-200 text-gray-500');
+    el.innerHTML = html;
+}
+
+function fetchBullhornResume(candidateId) {
+    bhResumeStatus('Checking Bullhorn for a resume…', 'info');
+    fetch("{% url 'bullhorn_candidate_search' %}" + candidateId + '/resume/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) { bhResumeStatus(data.error || 'Could not fetch resume from Bullhorn.', 'err'); return; }
+            if (!data.resume_text) {
+                bhResumeStatus('No resume on file in Bullhorn for this candidate. Upload or paste one below if you want resume-tailored content — or just continue without it.', 'warn');
+                return;
+            }
+            const ta = document.getElementById('candidate_resume_text');
+            ta.value = data.resume_text;
+            ta.classList.add('ring-2', 'ring-anura-200');
+            setTimeout(function() { ta.classList.remove('ring-2', 'ring-anura-200'); }, 1500);
+            bhResumeStatus(
+                'Resume pulled from Bullhorn: <b>' + escapeHtml(data.filename || 'resume') + '</b>' +
+                ' <button type="button" class="ml-2 underline font-semibold" onclick="removeBullhornResume()">Don’t include it</button>',
+                'ok');
+        })
+        .catch(function() { bhResumeStatus('Could not fetch resume from Bullhorn.', 'err'); });
+}
+
+function removeBullhornResume() {
+    document.getElementById('candidate_resume_text').value = '';
+    bhResumeStatus('Resume removed — the guide will be generated without it.', 'info');
 }
 
 // ── Bullhorn Job Order Search ──────────────────────────────

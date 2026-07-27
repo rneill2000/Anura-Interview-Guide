@@ -233,6 +233,54 @@ def search_candidates(query_text, count=10):
     return results
 
 
+def get_candidate_resume(candidate_id):
+    """
+    Fetch the best resume file for a candidate.
+
+    Candidates can have multiple files. Selection priority:
+      1. Most recent file with "anura" in the name (the Anura Connect version)
+      2. Most recent file typed/named as a resume
+      3. Most recent PDF or DOCX
+    Returns (filename, file_bytes) or (None, None) if no suitable file exists.
+    """
+    resp = _api_request(
+        "GET",
+        f"entity/Candidate/{candidate_id}/fileAttachments",
+        params={
+            "fields": "id,name,type,contentType,dateAdded",
+            "count": "50",
+        },
+    )
+    resp.raise_for_status()
+    files = resp.json().get("data", []) or []
+
+    def newest(candidates):
+        return max(candidates, key=lambda f: f.get("dateAdded") or 0) if candidates else None
+
+    def name_of(f):
+        return (f.get("name") or "").lower()
+
+    doc_files = [f for f in files if name_of(f).endswith((".pdf", ".docx", ".doc", ".txt"))]
+
+    pick = newest([f for f in doc_files if "anura" in name_of(f)])
+    if not pick:
+        pick = newest([
+            f for f in doc_files
+            if "resume" in name_of(f) or "resume" in (f.get("type") or "").lower()
+        ])
+    if not pick:
+        pick = newest(doc_files)
+    if not pick:
+        return None, None
+
+    file_resp = _api_request(
+        "GET",
+        f"file/Candidate/{candidate_id}/{pick['id']}/raw",
+    )
+    file_resp.raise_for_status()
+    return pick.get("name") or "resume", file_resp.content
+
+
 def get_candidate(candidate_id):
     """
     Fetch a single candidate by ID, returning name and email.

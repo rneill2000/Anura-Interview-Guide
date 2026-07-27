@@ -67,23 +67,9 @@ def _normalize_pdf_text(text: str) -> str:
     return text
 
 
-def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
-    """
-    Pull plain text out of an uploaded fit-analysis file (PDF/DOCX/TXT) or fall
-    back to pasted text. Returns "" on failure so the rest of the guide still
-    generates cleanly.
-    """
-    pasted = (pasted_text or "").strip()
-    if not uploaded_file:
-        return pasted
-
-    name = (uploaded_file.name or "").lower()
-    try:
-        data = uploaded_file.read()
-    except Exception as e:
-        logger.warning(f"Could not read uploaded fit file: {e}")
-        return pasted
-
+def _file_bytes_to_text(name: str, data: bytes) -> str:
+    """Extract plain text from PDF/DOCX/TXT file bytes. Returns '' on failure."""
+    name = (name or "").lower()
     text = ""
     try:
         if name.endswith(".pdf"):
@@ -102,8 +88,29 @@ def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
             except UnicodeDecodeError:
                 text = data.decode("latin-1", errors="replace")
     except Exception as e:
-        logger.warning(f"Could not parse fit file '{name}': {e}")
+        logger.warning(f"Could not parse file '{name}': {e}")
         text = ""
+    return text
+
+
+def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
+    """
+    Pull plain text out of an uploaded fit-analysis file (PDF/DOCX/TXT) or fall
+    back to pasted text. Returns "" on failure so the rest of the guide still
+    generates cleanly.
+    """
+    pasted = (pasted_text or "").strip()
+    if not uploaded_file:
+        return pasted
+
+    name = (uploaded_file.name or "").lower()
+    try:
+        data = uploaded_file.read()
+    except Exception as e:
+        logger.warning(f"Could not read uploaded fit file: {e}")
+        return pasted
+
+    text = _file_bytes_to_text(name, data)
 
     # Combine parsed file text + any pasted text (pasted wins as supplement)
     combined = "\n\n".join(t for t in (text.strip(), pasted) if t)
@@ -660,6 +667,28 @@ def delete_template(request, template_id):
 
 
 # -- Bullhorn API endpoints ------------------------------------------------
+
+def bullhorn_candidate_resume(request, candidate_id):
+    """AJAX: fetch a candidate's resume from Bullhorn and return extracted text.
+
+    Prefers the Anura Connect version when multiple files exist. Returns
+    resume_text='' (not an error) when the candidate has no resume on file.
+    """
+    if not _bullhorn_configured():
+        return JsonResponse({"ok": False, "error": "Bullhorn not configured."}, status=500)
+    try:
+        from core.bullhorn import get_candidate_resume
+        filename, data = get_candidate_resume(int(candidate_id))
+    except Exception as e:
+        logger.warning(f"Bullhorn resume fetch failed for {candidate_id}: {e}")
+        return JsonResponse({"ok": False, "error": "Could not fetch resume from Bullhorn."}, status=502)
+
+    if not data:
+        return JsonResponse({"ok": True, "resume_text": "", "filename": None})
+
+    text = _clean_pasted_text(_file_bytes_to_text(filename, data))
+    return JsonResponse({"ok": True, "resume_text": text, "filename": filename})
+
 
 def bullhorn_candidate_search(request):
     """AJAX endpoint to search Bullhorn candidates by name."""
