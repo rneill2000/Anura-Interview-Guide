@@ -506,6 +506,7 @@ const TEMPLATE_SCALAR_FIELDS = [
     'job_title', 'job_description',
     'health_system_name', 'health_system_info',
     'health_system_website', 'health_system_address',
+    'interview_date', 'interview_time',
     'interview_timezone', 'interview_format', 'interview_location',
     'contact_name', 'contact_email', 'contact_phone',
     'best_practices', 'follow_up_tips',
@@ -655,11 +656,11 @@ function autoSaveForm() {
 function restoreForm() {
     try {
         const saved = localStorage.getItem(AUTOSAVE_KEY);
-        if (!saved) return;
+        if (!saved) return false;
         const data = JSON.parse(saved);
         // Only restore if the form is currently empty (no server-side repopulation)
         const candidateName = document.getElementById('candidate_name');
-        if (candidateName && candidateName.value.trim()) return; // server already filled it
+        if (candidateName && candidateName.value.trim()) return false; // server already filled it
 
         Object.keys(data).forEach(function(key) {
             if (key === '__interviewers__') return;
@@ -677,13 +678,40 @@ function restoreForm() {
             && window.setInterviewersFromList) {
             window.setInterviewersFromList(data.__interviewers__);
         }
+        // Report whether anything meaningful was restored
+        return Object.keys(data).some(function(k) {
+            if (k === '__interviewers__') return (data[k] || []).length > 0;
+            return (data[k] || '').toString().trim() !== '';
+        });
     } catch(e) {}
+    return false;
 }
 
 // Restore on page load — deferred so interviewer helpers (defined later
 // in this script) exist before restore runs — then start auto-saving.
+// ?new=1  (from "Create Another Guide") → start with a blank form.
+// ?edit=1 (from "Edit This Guide") or any other visit → restore saved data.
 document.addEventListener('DOMContentLoaded', function() {
-    restoreForm();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+        clearAutoSave();
+    } else {
+        const restored = restoreForm();
+        // On a plain visit (not an explicit "Edit This Guide" click), let the
+        // user know old details were restored and offer a one-click fresh start.
+        if (restored && params.get('edit') !== '1') {
+            const form = document.getElementById('guideForm');
+            const note = document.createElement('div');
+            note.id = 'restoreNote';
+            note.className = 'flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-5';
+            note.innerHTML = '<span>Your previous details were restored so nothing is lost.</span>' +
+                '<span class="flex-shrink-0 ml-4">' +
+                '<a href="?new=1" class="font-semibold underline hover:text-amber-900">Start fresh</a>' +
+                '<button type="button" class="ml-4 font-semibold hover:text-amber-900" onclick="document.getElementById(\'restoreNote\').remove()">Dismiss</button>' +
+                '</span>';
+            form.insertBefore(note, form.firstElementChild);
+        }
+    }
     setInterval(autoSaveForm, 2000);
 });
 

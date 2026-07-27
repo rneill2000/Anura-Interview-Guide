@@ -24,17 +24,18 @@
                class="block w-full px-6 py-3 bg-anura-500 hover:bg-anura-600 text-white font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow">
                 Download PDF
             </a>
-            <a href="{% url 'index' %}"
+            <a href="{% url 'index' %}?edit=1"
                class="block w-full px-6 py-3 border-2 border-anura-500 text-anura-500 hover:bg-anura-50 font-semibold rounded-lg text-sm transition-all duration-200">
+                Edit This Guide
+            </a>
+            <a href="{% url 'index' %}?new=1"
+               class="block w-full px-6 py-3 border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium rounded-lg text-sm transition-all duration-200">
                 Create Another Guide
             </a>
         </div>
+        <p class="text-xs text-gray-400 mt-4">
+            "Edit This Guide" reopens the form with everything filled in so you can fix anything and regenerate.
+        </p>
     </div>
 </div>
-
-<script>
-// Guide generated successfully — clear the form auto-save so the next
-// guide starts fresh instead of pre-filling the previous health system.
-try { localStorage.removeItem('interviewGuideFormData'); } catch(e) {}
-</script>
 {% endblock %}
