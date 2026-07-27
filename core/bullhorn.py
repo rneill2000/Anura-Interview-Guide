@@ -256,6 +256,36 @@ def get_candidate(candidate_id):
 
 # -- Job Order Search ------------------------------------------------------
 
+def _html_to_clean_text(html):
+    """
+    Convert Bullhorn publicDescription HTML into clean plain text.
+
+    Bullhorn descriptions arrive as HTML whose source formatting (indentation,
+    blank lines between tags, &nbsp; entities) leaks into the form as extra
+    paragraph breaks and stray spacing. Convert tag structure to real line
+    breaks, then normalize whitespace.
+    """
+    import html as html_mod
+    if not html:
+        return ""
+    text = html
+    # Source-formatting newlines/tabs are layout noise, not real breaks
+    text = re.sub(r'[\r\n\t]+', ' ', text)
+    # Tag boundaries that DO mean a line break
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.I)
+    text = re.sub(r'</(p|div|tr|h[1-6]|ul|ol|table)>', '\n', text, flags=re.I)
+    text = re.sub(r'</li>', '', text, flags=re.I)
+    text = re.sub(r'<li[^>]*>', '\n- ', text, flags=re.I)
+    # Strip all remaining tags
+    text = re.sub(r'<[^>]+>', '', text)
+    # Decode entities (&nbsp; &amp; etc.), then normalize the nbsp to space
+    text = html_mod.unescape(text).replace(' ', ' ')
+    # Tidy each line, drop trailing space, collapse runs of blank lines
+    lines = [re.sub(r' {2,}', ' ', ln).strip() for ln in text.split('\n')]
+    text = '\n'.join(lines)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
 def search_job_orders(query_text, count=10):
     """
     Search for job orders in Bullhorn by title or keyword.
@@ -286,7 +316,7 @@ def search_job_orders(query_text, count=10):
             "title": jo.get("title", ""),
             "client": corp.get("name", "") if isinstance(corp, dict) else str(corp),
             "status": jo.get("status", ""),
-            "description": jo.get("publicDescription", "") or "",
+            "description": _html_to_clean_text(jo.get("publicDescription", "") or ""),
         })
     return results
 
@@ -309,5 +339,5 @@ def get_job_order(job_order_id):
         "id": data.get("id"),
         "title": data.get("title", ""),
         "client": corp.get("name", "") if isinstance(corp, dict) else str(corp),
-        "description": data.get("publicDescription", "") or "",
+        "description": _html_to_clean_text(data.get("publicDescription", "") or ""),
     }

@@ -629,6 +629,19 @@ function autoSaveForm() {
             data['__id__' + el.id] = el.value;
         }
     });
+    // Save interviewer rows (dynamic fields with no name attribute)
+    const ivs = [];
+    document.querySelectorAll('#interviewersContainer .interviewer-row').forEach(function(row) {
+        const iv = {};
+        let any = false;
+        ['name', 'title', 'linkedin', 'background', 'custom_notes'].forEach(function(f) {
+            const el = row.querySelector('[data-field="' + f + '"]');
+            iv[f] = el ? el.value : '';
+            if (iv[f].trim()) any = true;
+        });
+        if (any) ivs.push(iv);
+    });
+    data.__interviewers__ = ivs;
     try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
@@ -642,6 +655,7 @@ function restoreForm() {
         if (candidateName && candidateName.value.trim()) return; // server already filled it
 
         Object.keys(data).forEach(function(key) {
+            if (key === '__interviewers__') return;
             if (key.startsWith('__id__')) {
                 const el = document.getElementById(key.slice(6));
                 if (el) el.value = data[key];
@@ -650,12 +664,21 @@ function restoreForm() {
                 if (el) el.value = data[key];
             }
         });
+        // Restore interviewer rows (only if none are filled in yet)
+        const existing = window.getInterviewersList ? window.getInterviewersList() : [];
+        if (!existing.length && Array.isArray(data.__interviewers__) && data.__interviewers__.length
+            && window.setInterviewersFromList) {
+            window.setInterviewersFromList(data.__interviewers__);
+        }
     } catch(e) {}
 }
 
-// Restore on page load, then start auto-saving
-restoreForm();
-setInterval(autoSaveForm, 2000);
+// Restore on page load — deferred so interviewer helpers (defined later
+// in this script) exist before restore runs — then start auto-saving.
+document.addEventListener('DOMContentLoaded', function() {
+    restoreForm();
+    setInterval(autoSaveForm, 2000);
+});
 
 // Clear saved data after a successful download
 function clearAutoSave() {
@@ -1167,11 +1190,8 @@ function selectJobOrder(jobId, title, client) {
         if (data.ok && data.job_order) {
             // Fill job title
             document.getElementById('job_title').value = data.job_order.title;
-            // Strip HTML tags from the description and fill
-            const tmp = document.createElement('div');
-            tmp.innerHTML = data.job_order.description;
-            const plainText = tmp.textContent || tmp.innerText || '';
-            document.getElementById('job_description').value = plainText.trim();
+            // Server sends the description as clean plain text
+            document.getElementById('job_description').value = (data.job_order.description || '').trim();
             // Fill health system name from client corporation
             if (data.job_order.client) {
                 document.getElementById('health_system_name').value = data.job_order.client;

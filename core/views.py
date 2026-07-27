@@ -44,6 +44,29 @@ def _clean_pasted_text(text: str) -> str:
     return text.strip()
 
 
+def _normalize_pdf_text(text: str) -> str:
+    """
+    Clean up common PDF text-extraction artifacts:
+    - Stylized (letter-spaced) headings extract one character per line;
+      re-join runs of single-character lines into words.
+    - Every visual line ends in a hard newline; unwrap breaks that fall
+      mid-sentence while keeping real paragraph/heading breaks.
+    """
+    if not text:
+        return text
+
+    # Re-join letter-per-line runs (3+ consecutive single-char lines)
+    def _join_letters(m):
+        return ''.join(' ' if ln == '' or ln == ' ' else ln
+                       for ln in m.group(0).split('\n')).strip() + '\n'
+    text = re.sub(r'(?:^.$\n){3,}(?:^.$\n?)?', _join_letters, text, flags=re.MULTILINE)
+
+    # Unwrap mid-sentence line breaks: line ends lowercase/comma/semicolon
+    # and the next line starts lowercase → it's one flowing sentence.
+    text = re.sub(r'(?<=[a-z,;])\n(?=[a-z(])', ' ', text)
+    return text
+
+
 def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
     """
     Pull plain text out of an uploaded fit-analysis file (PDF/DOCX/TXT) or fall
@@ -67,6 +90,7 @@ def _extract_fit_text(uploaded_file, pasted_text: str) -> str:
             from pypdf import PdfReader
             reader = PdfReader(io.BytesIO(data))
             text = "\n".join((p.extract_text() or "") for p in reader.pages)
+            text = _normalize_pdf_text(text)
         elif name.endswith(".docx"):
             import docx  # python-docx
             doc = docx.Document(io.BytesIO(data))
